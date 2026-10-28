@@ -1,0 +1,147 @@
+{
+  "tool": "image_gen (built-in)",
+  "format": "PNG",
+  "offline": true,
+  "prompts": [
+    {
+      "file": "biceps-curl.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing dumbbell biceps curl, elbows close to torso. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "biceps-poulie.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing low cable biceps curl with straight bar, cable attached at floor. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "curl-haltere.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated alternating dumbbell biceps curl. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "curl-barre-ez.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing EZ bar biceps curl with curved EZ bar. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "avant-bras.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated wrist curl, forearms resting on bench holding a light barbell, small wrist flexion. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "triceps-poulie.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing cable triceps pushdown with straight bar, pulley above head. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "dips-machine.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated triceps dip machine press, back against seat, hands pressing side handles down. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "dips-assistes.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show assisted parallel-bar dip machine, knees resting on assistance pad, hands grasp parallel bars. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "pompes.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show floor push-up, straight plank body, palms on floor, elbows bent. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "pec-fly.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated pec deck chest fly machine, back on pad, arms coming together in front of chest. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "pec-fly-incline.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show incline dumbbell chest fly lying on incline bench, slightly bent elbows, dumbbells held above chest. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "developpe-couche-smith.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show flat bench press inside Smith machine, bar moves on vertical guide rails, athlete lying on bench. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "chest-press-incline.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated incline chest press machine with two handles in front of upper chest. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "traction.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show unassisted pull-up on high horizontal bar, athlete suspended, chin approaching bar, full body visible. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "traction-assistee.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show assisted pull-up machine, athlete knees on assistance platform and hands gripping overhead handles. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "seated-row.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated low cable row, feet braced, neutral back, two hands pulling handle toward lower ribs. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "lombaires.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show 45 degree back extension on Roman chair, hips on pad, torso aligned with legs. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "shoulder-press.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated shoulder press machine, handles overhead, back supported, elbows slightly bent. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "shoulder-press-smith.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated overhead shoulder press under Smith machine vertical guide rails. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "rear-delt.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show reverse pec deck rear deltoid machine, athlete facing chest pad, arms spread out to sides. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "face-pull.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing rope cable face pull, cable at eye height, rope ends pulled toward forehead. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "leg-extension-curl.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated leg extension machine, knees aligned to machine pivot, shins behind roller pad, legs extending forward. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "hack-squat.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show 45 degree hack squat sled machine, back on sled pad, shoulder pads, feet on platform, knees bent. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "leg-press.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show 45 degree seated leg press machine, back supported, both feet on large sled platform. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "squat-smith.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing squat inside Smith machine, bar resting on upper back and moving on vertical rails. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "squat-libre.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show barbell back squat in open squat rack, bar across upper back, heels on floor, knees bent. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "hip-adduction.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show seated hip adductor machine, padded supports against inner knees, bringing thighs together. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "pistol-squat.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show single leg pistol squat, one leg straight forward, standing heel planted, arms forward for balance. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "mollets.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing calf raise machine, shoulder pads, toes on step and heels raised. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "abdominaux.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show controlled floor abdominal crunch on dark exercise mat, knees bent, hands lightly beside head without pulling neck. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "rameur-cardio.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show rowing ergometer machine, athlete seated with feet strapped, handle pulled toward lower ribs. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "marche-inclinee.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show athlete walking on inclined treadmill, upright torso, natural arms, no holding rails. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "elevations-laterales.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing dumbbell lateral raises, arms lifted to sides to shoulder height, elbows softly bent. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "triceps-corde.png",
+      "prompt": "Create one polished raster exercise illustration for an offline premium strength-training iPhone app. Show standing cable rope triceps pushdown, rope ends separated at hips, elbows beside torso. Full athlete and relevant equipment visible, three-quarter side view chosen for clear recognition, anatomically plausible athletic adult wearing plain dark sportswear and muted green shirt, realistic refined 3D educational rendering, graphite equipment with restrained mint-green details, solid dark charcoal #101519 studio background, soft studio light. Wide landscape composition, centered, generous margins. No lettering, logos, watermark or UI. One image only, no collage."
+    },
+    {
+      "file": "lat-pulldown.png",
+      "prompt": "One image, wide landscape, realistic 3D exercise illustration for a premium offline gym iPhone app. Correct FRONT-OF-NECK LAT PULLDOWN. View athlete from the FRONT at a slight angle, seated under a cable machine, thigh pads securing legs. The lat bar is IN FRONT of the athlete's chest, below the chin and well IN FRONT of the neck, NEVER behind the head. Hands symmetrically gripping wide bar, elbows directed down, torso upright, face visible. Show entire athlete and machine with generous margins. Muted green short sleeve athletic shirt, dark shorts, graphite machine with restrained mint details. Solid dark #101519 studio background, soft sophisticated lighting, realistic human anatomy and functional equipment. No text, no logo, no collage, no UI."
+    }
+  ]
+}

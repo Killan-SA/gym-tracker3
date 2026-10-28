@@ -1,0 +1,414 @@
+// Exercise the real SQL against an isolated in-memory SQLite database.
+// The adapter exposes the synchronous Expo SQLite API used by the application.
+const assert = require('node:assert/strict');
+const { DatabaseSync } = require('node:sqlite');
+const fs = require('node:fs');
+const Module = require('node:module');
+const ts = require('typescript');
+const database = new DatabaseSync(':memory:');
+database.exec(`
+  CREATE TABLE sessions (id TEXT PRIMARY KEY, date TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL);
+  CREATE TABLE exercises (id TEXT PRIMARY KEY, session_id TEXT REFERENCES sessions(id) ON DELETE CASCADE, name TEXT NOT NULL, order_index INTEGER DEFAULT 0, notes TEXT);
+  CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_id TEXT REFERENCES exercises(id) ON DELETE CASCADE, set_number INTEGER NOT NULL, weight REAL DEFAULT 0, reps INTEGER DEFAULT 0, notes TEXT);
+  INSERT INTO sessions VALUES ('legacy', '2026-01-01T12:00:00.000Z', 'Mes anciennes données', '2026-01-01T12:00:00.000Z');
+  INSERT INTO exercises VALUES ('legacy-ex', 'legacy', 'Lat pulldown', 0, NULL);
+  INSERT INTO sets VALUES ('legacy-set', 'legacy-ex', 1, 80, 8, NULL);
+`);
+const params = args => Array.isArray(args[0]) ? args[0] : args;
+const adapter = {
+  execSync: sql => database.exec(sql),
+  runSync: (sql, ...args) => database.prepare(sql).run(...params(args)),
+  getFirstSync: (sql, ...args) => database.prepare(sql).get(...params(args)) ?? null,
+  getAllSync: (sql, ...args) => database.prepare(sql).all(...params(args)),
+  withTransactionSync: fn => {
+    database.exec('SAVEPOINT expo_transaction');
+    try { fn(); database.exec('RELEASE expo_transaction'); }
+    catch (error) { database.exec('ROLLBACK TO expo_transaction; RELEASE expo_transaction;'); throw error; }
+  },
+};
+const originalLoad = Module._load;
+Module._load = function(name, parent, isMain) { if (name === 'expo-sqlite') return { openDatabaseSync: () => adapter }; return originalLoad.call(this, name, parent, isMain); };
+require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename);
+const q = require('../lib/queries.ts');
+const db = require('../lib/database.ts');
+const redesign = require('../lib/redesign.ts');
+const units = require('../lib/units.ts');
+const { useSettingsStore } = require('../store/settings.ts');
+let passed = 0;
+function test(name, fn) { fn(); passed++; process.stdout.write(`OK ${name}\n`); }
+
+test('Legacy SQLite migration preserves workout rows and adds optional RPE', () => {
+  const session = q.getSessionWithExercises('legacy');
+  assert.equal(session.notes, 'Mes anciennes données');
+  assert.equal(session.exercises[0].sets[0].weight, 80);
+  assert.equal(session.exercises[0].sets[0].rpe, null);
+  assert.equal(database.prepare('PRAGMA user_version').get().user_version, 3);
+});
+let session, exercise, set;
+test('Existing session, custom exercise and RPE CRUD work', () => {
+  q.addCustomExercise('Test perso', 'Dos');
+  assert.ok(q.getCustomExercises().some(e => e.name === 'Test perso'));
+  session = q.createSession('Test'); exercise = q.addExerciseToSession(session.id, 'Lat pulldown');
+  set = q.addSet(exercise.id, 82.5, 8, 8.5);
+  assert.equal(q.getLastSetForExercise(exercise.id).rpe, 8.5);
+  q.updateSet(set.id, 85, 9, 9);
+  assert.equal(q.getSessionVolume(session.id), 765);
+});
+test('Previous performance excludes the active session and later sessions', () => {
+  assert.deepEqual({ ...redesign.getPreviousPerformance('Lat pulldown', session.id) }, { weight: 80, reps: 8 });
+  const future = q.createSession();
+  database.prepare('UPDATE sessions SET date = ? WHERE id = ?').run('2099-01-01T12:00:00.000Z', future.id);
+  const ex = q.addExerciseToSession(future.id, 'Lat pulldown'); q.addSet(ex.id, 200, 12);
+  assert.equal(redesign.getPreviousPerformance('Lat pulldown', session.id).weight, 80);
+  q.deleteSession(future.id);
+});
+test('Favorites persist locally and recover from malformed preferences', () => {
+  assert.deepEqual(redesign.toggleFavorite('Lat pulldown'), ['Lat pulldown']);
+  assert.deepEqual(redesign.getFavorites(), ['Lat pulldown']);
+  assert.deepEqual(redesign.toggleFavorite('Lat pulldown'), []);
+  db.setUserSetting('favorite_exercises', 'broken'); assert.deepEqual(redesign.getFavorites(), []);
+  db.setUserSetting('favorite_exercises', '[123,"Pompes"]'); assert.deepEqual(redesign.getFavorites(), ['Pompes']);
+});
+test('Session names and durations are additive and duration survives a second finish', () => {
+  redesign.setSessionTitle(session.id, 'PUSH'); redesign.finishSession(session.id, 3850);
+  redesign.finishSession(session.id, 8000);
+  assert.equal(redesign.getSessionTitle(session.id), 'PUSH');
+  assert.equal(redesign.getSessionDurationLabel(session.id), '1h04');
+  assert.equal(redesign.getSessionDurationLabel('legacy'), null);
+});
+test('Program day advances once and new sessions contain the prescribed exercises', () => {
+  useSettingsStore.getState().loadSettings();
+  assert.equal(useSettingsStore.getState().themeId, 'green');
+  useSettingsStore.getState().setCurrentProgram('ppl');
+  const programSession = q.createSessionFromProgramDay(['Pompes', 'Lat pulldown'], 1);
+  useSettingsStore.getState().loadSettings();
+  assert.equal(useSettingsStore.getState().currentProgramDayIndex, 1);
+  assert.equal(q.getSessionWithExercises(programSession).exercises.length, 2);
+  redesign.finishSession(programSession, 3600);
+  assert.equal(useSettingsStore.getState().currentProgramDayIndex, 1);
+  db.setUserSetting('themeId', 'purple'); useSettingsStore.getState().loadSettings();
+  assert.equal(useSettingsStore.getState().themeId, 'purple');
+});
+test('kg/lbs conversions preserve the canonical kg value', () => {
+  for (const kg of [0, 2.5, 72, 82.5, 150]) assert.ok(Math.abs(units.toKg(units.fromKg(kg, false), false) - kg) < 1e-9);
+  assert.equal(units.unitLabel(false), 'lbs'); assert.equal(units.formatWeight(80, true), '80 kg');
+});
+test('All dashboard queries, history metrics and charts work with real SQL', () => {
+  assert.ok(q.getDashboardStats().totalSessionCount >= 3);
+  assert.ok(q.getTotalVolumeAllTime() >= 1405);
+  assert.ok(q.getPersonalRecords().some(e => e.name === 'Lat pulldown' && e.weight === 85));
+  assert.equal(q.getExerciseStats('Lat pulldown').personalRecord, 85);
+  assert.ok(q.getWeightHistory('Lat pulldown').length >= 2);
+  q.getWeeklyReport(); q.getVolumeByMuscleGroup(); q.getFrequentSessionTemplates(); q.getSmartSessionRecommendation(); q.getMuscleGroupFrequency();
+});
+test('Deleting a series or session preserves unrelated legacy data', () => {
+  q.deleteSet(set.id); assert.equal(q.getSessionWithExercises(session.id).exercises[0].sets.length, 0);
+  const extra = q.addSet(exercise.id, 20, 10); q.deleteExercise(exercise.id);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM sets WHERE id = ?').get(extra.id).n, 0);
+  q.deleteSession(session.id); assert.equal(q.getSessionWithExercises(session.id), null);
+  assert.equal(q.getSessionWithExercises('legacy').exercises[0].sets[0].weight, 80);
+});
+test('XLSX import preview, persistence and duplicate detection remain available', () => {
+  const XLSX = require('xlsx');
+  const importer = require('../lib/importXlsx.ts');
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['Date', 'Machine', 'Serie', 'Poids', 'Reps'],
+    ['15/02/2025', 'Seated row', 1, 40, 10],
+    ['15/02/2025', 'Seated row', 2, 42.5, 8],
+  ]), 'Historique');
+  const preview = importer.parseXlsxFile(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
+  assert.deepEqual(preview.errors, []);
+  assert.equal(preview.previews.length, 1);
+  assert.equal(preview.previews[0].totalSets, 2);
+  assert.deepEqual(importer.importPreviews(preview.previews), { imported: 1, duplicates: 0 });
+  assert.deepEqual(importer.importPreviews(preview.previews), { imported: 0, duplicates: 1 });
+  assert.equal(q.getExercisePersonalRecord('Seated row'), 42.5);
+});
+test('First launch offers setup, resumes interrupted setup, and saves each program or free mode', () => {
+  const onboarding = require('../lib/onboarding.ts');
+  assert.equal(onboarding.needsOnboarding(), true, 'An existing installation without a name should offer profile setup without deleting workouts');
+  database.exec('SAVEPOINT welcome_test; DELETE FROM sets; DELETE FROM exercises; DELETE FROM sessions; DELETE FROM app_settings; DELETE FROM user_settings;');
+  try {
+    useSettingsStore.getState().loadSettings();
+    assert.equal(onboarding.needsOnboarding(), true);
+    onboarding.beginOnboarding();
+    useSettingsStore.getState().setCurrentProgram('ppl');
+    q.setUserBodyweight(70);
+    assert.equal(onboarding.needsOnboarding(), true, 'Interrupted setup must remain visible even after partial saves');
+    for (const program of ['ppl', 'full-body', 'upper-lower', null]) {
+      onboarding.completeOnboarding(program, 72.5, '  Kilian  ', ['biceps', 'back']);
+      useSettingsStore.getState().loadSettings();
+      assert.equal(useSettingsStore.getState().currentProgramId, program);
+      assert.equal(useSettingsStore.getState().currentProgramDayIndex, 0);
+      assert.equal(q.getUserBodyweight(), 72.5);
+      assert.equal(onboarding.needsOnboarding(), false);
+      assert.equal(db.getUserSetting('display_name'), 'Kilian');
+    }
+    assert.throws(() => onboarding.completeOnboarding('unknown', 75, 'Kilian'));
+    assert.throws(() => onboarding.completeOnboarding(null, -2, 'Kilian'));
+    assert.throws(() => onboarding.completeOnboarding(null, 75, '   '));
+    assert.equal(useSettingsStore.getState().currentProgramId, null);
+  } finally {
+    database.exec('ROLLBACK TO welcome_test; RELEASE welcome_test;');
+    useSettingsStore.getState().loadSettings();
+  }
+});
+test('Bodyweight accepts decimal commas and lbs and rejects malformed or out-of-range entries', () => {
+  const { parseBodyweight } = require('../lib/onboarding.ts');
+  assert.equal(parseBodyweight('72,5', true), 72.5);
+  assert.equal(parseBodyweight(' 72.5 ', true), 72.5);
+  assert.ok(Math.abs(parseBodyweight('160', false) - units.toKg(160, false)) < 1e-9);
+  for (const value of ['', '0', '-72', '72abc', '72,5,3', 'Infinity', '301']) assert.equal(parseBodyweight(value, true), null);
+  assert.equal(parseBodyweight('700', false), null);
+});
+test('Every predefined and prescribed exercise has a bundled local raster image', () => {
+  require.extensions['.png'] = (module, filename) => { module.exports = filename; };
+  const { EXERCISE_IMAGES } = require('../assets/exercises/images.ts');
+  const { PREDEFINED_EXERCISES } = require('../constants/exercises.ts');
+  const { TRAINING_PROGRAMS } = require('../lib/programs.ts');
+  const names = new Set([...PREDEFINED_EXERCISES.map(e => e.name), ...TRAINING_PROGRAMS.flatMap(p => p.days.flatMap(d => d.exerciseNames))]);
+  for (const name of names) {
+    const file = EXERCISE_IMAGES[name];
+    assert.ok(file, `Missing offline image for ${name}`);
+    const bytes = fs.readFileSync(file);
+    assert.equal(bytes.subarray(1, 4).toString(), 'PNG', `Invalid PNG for ${name}`);
+    assert.ok(bytes.readUInt32BE(16) >= 512 && bytes.readUInt32BE(20) >= 512, `Image is too small: ${name}`);
+  }
+  assert.equal(new Set(Object.values(EXERCISE_IMAGES)).size, names.size);
+});
+test('Profile and goals persist, and completing setup preserves the day of an unchanged program', () => {
+  const { useProfileStore } = require('../store/profile.ts');
+  const onboarding = require('../lib/onboarding.ts');
+  database.exec('SAVEPOINT profile_test');
+  try {
+    useSettingsStore.getState().setCurrentProgram('ppl');
+    useSettingsStore.getState().setProgramDayIndex(2);
+    onboarding.completeOnboarding('ppl', null, '  Léa   Marie  ', ['chest', 'glutes', 'chest']);
+    useProfileStore.getState().loadProfile();
+    assert.equal(useProfileStore.getState().name, 'Léa Marie');
+    assert.deepEqual(useProfileStore.getState().goals, ['chest', 'glutes']);
+    assert.equal(useSettingsStore.getState().currentProgramDayIndex, 2);
+    assert.equal(onboarding.needsOnboarding(), false);
+    db.setUserSetting('training_goals', 'bad json'); useProfileStore.getState().loadProfile();
+    assert.deepEqual(useProfileStore.getState().goals, []);
+  } finally { database.exec('ROLLBACK TO profile_test; RELEASE profile_test'); useSettingsStore.getState().loadSettings(); useProfileStore.getState().loadProfile(); }
+});
+test('Goal-based recommendations retain the three classics and provide executable workouts', () => {
+  const { getProgramsForGoals, TRAINING_PROGRAMS } = require('../lib/programs.ts');
+  const { PREDEFINED_EXERCISES } = require('../constants/exercises.ts');
+  const names = new Set(PREDEFINED_EXERCISES.map(e => e.name));
+  assert.equal(TRAINING_PROGRAMS.length, 7);
+  for (const goal of ['biceps', 'chest', 'back', 'glutes']) {
+    const programs = getProgramsForGoals([goal]);
+    assert.equal(programs[0].id, `focus-${goal}`);
+    for (const id of ['ppl', 'full-body', 'upper-lower']) assert.ok(programs.some(p => p.id === id));
+    assert.equal(programs[0].days.length, 3);
+    for (const day of programs[0].days) {
+      assert.equal(new Set(day.exerciseNames).size, day.exerciseNames.length);
+      for (const name of day.exerciseNames) assert.ok(names.has(name), `Unknown exercise: ${name}`);
+    }
+  }
+  assert.deepEqual(getProgramsForGoals(['back', 'biceps']).slice(0, 2).map(p => p.id).sort(), ['focus-back', 'focus-biceps']);
+});
+test('Library exercise creation persists without creating a workout and rejects normalized duplicates', () => {
+  const { createCustomExercise } = require('../lib/customExercises.ts');
+  const count = q.getAllSessions().length;
+  const name = createCustomExercise('  Ma   machine fessiers  ', 'Jambes');
+  assert.equal(name, 'Ma machine fessiers');
+  assert.ok(q.getCustomExercises().some(e => e.name === name && e.category === 'Jambes'));
+  assert.equal(q.getAllSessions().length, count);
+  assert.throws(() => createCustomExercise('ma machine FESSIERS', 'Jambes'));
+  assert.throws(() => createCustomExercise(' CURL HALTERE ', 'Biceps'));
+  assert.throws(() => createCustomExercise('  ', 'Autre'));
+  assert.throws(() => createCustomExercise('Exercice inconnu', 'Catégorie invalide'));
+});
+test('Full reset clears all personal data and requests fresh setup immediately', () => {
+  const { resetAppData } = require('../lib/resetApp.ts');
+  const { useProfileStore } = require('../store/profile.ts');
+  const onboarding = require('../lib/onboarding.ts');
+  database.exec('SAVEPOINT reset_test');
+  try {
+    onboarding.completeOnboarding('focus-glutes', 65, 'Léa', ['glutes']);
+    useSettingsStore.getState().setUseKg(false);
+    useSettingsStore.getState().setThemeId('purple');
+    require('../lib/tutorial.ts').finishTutorial();
+    const revision = useProfileStore.getState().setupRevision;
+    resetAppData();
+    for (const table of ['sessions', 'exercises', 'sets', 'exercise_names', 'custom_exercises', 'app_settings', 'user_settings']) assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, 0, `Personal data remain in ${table}`);
+    assert.equal(useProfileStore.getState().setupRevision, revision + 1);
+    assert.equal(useProfileStore.getState().name, '');
+    assert.deepEqual(useProfileStore.getState().goals, []);
+    assert.equal(q.getUserBodyweight(), 0);
+    assert.equal(useSettingsStore.getState().currentProgramId, null);
+    assert.equal(useSettingsStore.getState().useKg, true);
+    assert.equal(useSettingsStore.getState().themeId, 'green');
+    assert.equal(onboarding.needsOnboarding(), true);
+    assert.equal(require('../lib/tutorial.ts').needsTutorial(), true);
+    onboarding.completeOnboarding(null, null, 'Alex', []);
+    assert.equal(onboarding.needsOnboarding(), false);
+    assert.equal(q.getUserBodyweight(), 0);
+  } finally { database.exec('ROLLBACK TO reset_test; RELEASE reset_test'); useSettingsStore.getState().loadSettings(); useProfileStore.getState().loadProfile(); }
+});
+test('Aggregate volume uses metric tonnes from 1000 kg without changing load or lbs formatting', () => {
+  assert.equal(units.formatVolume(999), '999 kg');
+  assert.equal(units.formatVolume(1000), '1 t');
+  assert.equal(units.formatVolume(1250), '1,25 t');
+  assert.equal(units.formatVolume(1000000).replace(/[\s\u202f\u00a0]/g, ''), '1000t');
+  assert.equal(units.formatVolume(-10), '0 kg');
+  assert.equal(units.formatVolume(Infinity), '0 kg');
+  assert.ok(units.formatVolume(1000, false).endsWith(' lbs'));
+  assert.equal(units.formatWeight(1000, true), '1000 kg');
+});
+test('Muscle balance includes bodyweight and custom groups, ignores empty, old and future sets', () => {
+  const balance = require('../lib/trainingBalance.ts');
+  const dayjs = require('dayjs');
+  database.exec('SAVEPOINT balance_test; DELETE FROM sets; DELETE FROM exercises; DELETE FROM sessions;');
+  try {
+    let lastSession;
+    for (let i = 0; i < 3; i++) {
+      const session = q.createSession(); lastSession = session;
+      const pushup = q.addExerciseToSession(session.id, 'Pompes'); q.addSet(pushup.id, 0, 12);
+      const curl = q.addExerciseToSession(session.id, 'Biceps curl'); q.addSet(curl.id, 10, 8);
+      const empty = q.addExerciseToSession(session.id, 'Leg press'); q.addSet(empty.id, 150, 0);
+      const cardio = q.addExerciseToSession(session.id, 'Rameur (Cardio)'); q.addSet(cardio.id, 0, 20);
+      if (i === 0) assert.equal(balance.getTrainingBalance(7).enoughData, false);
+    }
+    q.addCustomExercise('Curl analytique', 'Biceps');
+    const custom = q.addExerciseToSession(lastSession.id, 'Curl analytique'); q.addSet(custom.id, 15, 10);
+    for (const date of [dayjs().subtract(50, 'day').toISOString(), dayjs().add(2, 'day').toISOString()]) {
+      const session = q.createSession(); database.prepare('UPDATE sessions SET date = ? WHERE id = ?').run(date, session.id);
+      const ex = q.addExerciseToSession(session.id, 'Leg press'); q.addSet(ex.id, 200, 12);
+    }
+    const result = balance.getTrainingBalance(7);
+    assert.equal(result.enoughData, true); assert.equal(result.sessionCount, 3);
+    assert.equal(result.muscles.find(m => m.id === 'chest').score, 3);
+    assert.equal(result.muscles.find(m => m.id === 'chest').status, 'strong');
+    assert.equal(result.muscles.find(m => m.id === 'biceps').score, 4);
+    assert.equal(result.muscles.find(m => m.id === 'triceps').score, 1.5);
+    assert.equal(result.muscles.find(m => m.id === 'quads').score, 0);
+    assert.equal(result.muscles.find(m => m.id === 'quads').status, 'low');
+    assert.equal(result.unclassifiedSets, 3);
+    assert.equal(balance.getTrainingPeriodStats(7).volume, 390);
+    assert.equal(balance.getTrainingPeriodStats(7).sessions, 3);
+    const selection = result.muscles.map(m => ({ ...m, status: m.id === 'back' ? 'low' : 'balanced' }));
+    assert.equal(balance.recommendBalanceProgram(selection).program.id, 'focus-back');
+    assert.equal(balance.recommendBalanceProgram(result.muscles.map(m => ({ ...m, status: 'unknown' }))), null);
+  } finally { database.exec('ROLLBACK TO balance_test; RELEASE balance_test'); }
+});
+test('Volume comparisons use explicit reference masses and never change the stored volume', () => {
+  const { getVolumeComparisons } = require('../lib/trainingBalance.ts');
+  const values = getVolumeComparisons(1500);
+  assert.equal(values.find(v => v.id === 'car').count, 1.5);
+  assert.equal(values.find(v => v.id === 'water').count, 250);
+  assert.ok(getVolumeComparisons(0).every(v => v.count === 0));
+  assert.ok(getVolumeComparisons(NaN).every(v => v.count === 0));
+});
+test('First-run tutorial is offered once and can be completed or skipped', () => {
+  const tutorial = require('../lib/tutorial.ts');
+  database.exec('SAVEPOINT tutorial_test;');
+  database.prepare('DELETE FROM user_settings WHERE key = ?').run('tutorial_v1');
+  try {
+    assert.equal(tutorial.needsTutorial(), true);
+    tutorial.finishTutorial(false); assert.equal(tutorial.needsTutorial(), false);
+    assert.equal(db.getUserSetting('tutorial_v1'), 'complete');
+    tutorial.finishTutorial(true); assert.equal(db.getUserSetting('tutorial_v1'), 'skipped');
+    assert.equal(tutorial.needsTutorial(), false);
+  } finally { database.exec('ROLLBACK TO tutorial_test; RELEASE tutorial_test'); }
+});
+test('Bodyweight pyramids generate ascending, descending and full patterns with a single peak', () => {
+  const { buildPyramid, DEFAULT_PYRAMID } = require('../lib/pyramid.ts');
+  assert.deepEqual(buildPyramid(DEFAULT_PYRAMID), [2, 4, 6, 4, 2]);
+  assert.deepEqual(buildPyramid({ ...DEFAULT_PYRAMID, direction: 'ascending' }), [2, 4, 6]);
+  assert.deepEqual(buildPyramid({ ...DEFAULT_PYRAMID, direction: 'descending' }), [6, 4, 2]);
+  assert.deepEqual(buildPyramid({ start: 4, step: 3, levels: 4, direction: 'updown' }), [4, 7, 10, 13, 10, 7, 4]);
+  for (const config of [{ start: 0 }, { start: 1.5 }, { step: 0 }, { levels: 1 }, { levels: 9 }, { start: 99, step: 2 }, { start: NaN }, { direction: 'invalid' }]) assert.throws(() => buildPyramid({ ...DEFAULT_PYRAMID, ...config }));
+});
+test('Pyramid progress persists, requires validation and records only performed repetitions', () => {
+  const p = require('../lib/pyramid.ts');
+  database.exec('SAVEPOINT pyramid_test');
+  try {
+    const session = q.createSession();
+    const ex = q.addExerciseToSession(session.id, 'Pompes');
+    const classic = q.addSet(ex.id, 60, 9);
+    const baseline = q.getSessionVolume(session.id);
+    q.setUserBodyweight(72.5);
+    useSettingsStore.getState().setUseKg(false);
+    const plan = p.savePyramidPlan(ex.id, p.DEFAULT_PYRAMID);
+    assert.equal(p.getPyramidPlan(ex.id).runId, plan.runId);
+    const first = p.addNextPyramidSet(ex.id);
+    assert.equal(first.weight, 72.5, 'Stored weights must remain in kg with lbs display enabled');
+    assert.equal(first.reps, 0);
+    assert.equal(p.parsePyramidSet(first.notes).targetReps, 2);
+    assert.equal(q.getSessionVolume(session.id), baseline, 'Planned repetitions must not inflate volume');
+    assert.throws(() => p.addNextPyramidSet(ex.id));
+    db.setUserSetting(`set_confirmed:${first.id}`, '1');
+    assert.equal(p.getPyramidProgress(ex.id).completed, 0, 'A zero-rep row cannot complete a step');
+    q.updateSet(first.id, 72.5, 1, 8);
+    assert.equal(p.getPyramidProgress(ex.id).completed, 1);
+    assert.equal(q.getSessionVolume(session.id), baseline + 72.5);
+    p.setPyramidEnabled(ex.id, false);
+    assert.throws(() => p.addNextPyramidSet(ex.id));
+    p.setPyramidEnabled(ex.id, true);
+    assert.equal(p.getPyramidProgress(ex.id).completed, 1);
+    for (let index = 1; index < 5; index++) {
+      const added = p.addNextPyramidSet(ex.id);
+      assert.equal(p.parsePyramidSet(added.notes).index, index);
+      const target = p.parsePyramidSet(added.notes).targetReps;
+      q.updateSet(added.id, 72.5, target, null);
+      db.setUserSetting(`set_confirmed:${added.id}`, '1');
+    }
+    assert.equal(p.getPyramidProgress(ex.id).finished, true);
+    assert.throws(() => p.addNextPyramidSet(ex.id));
+    const before = q.getSessionWithExercises(session.id).exercises[0].sets;
+    assert.ok(before.some(set => set.id === classic.id));
+    p.savePyramidPlan(ex.id, { ...p.DEFAULT_PYRAMID, direction: 'descending' });
+    assert.equal(p.getPyramidProgress(ex.id).completed, 0);
+    assert.equal(p.getPyramidProgress(ex.id).targets[0], 6);
+    assert.equal(q.getSessionWithExercises(session.id).exercises[0].sets.length, before.length);
+    q.setUserBodyweight(0);
+    const newSet = p.addNextPyramidSet(ex.id);
+    q.updateSet(newSet.id, 0, 6); db.setUserSetting(`set_confirmed:${newSet.id}`, '1');
+    assert.equal(p.getPyramidProgress(ex.id).completed, 1, 'Bodyweight repetitions remain usable without a configured bodyweight');
+  } finally { database.exec('ROLLBACK TO pyramid_test; RELEASE pyramid_test'); useSettingsStore.getState().loadSettings(); }
+});
+test('Pyramids are restricted to bodyweight exercises and handle missing or malformed plans', () => {
+  const p = require('../lib/pyramid.ts');
+  const session = q.createSession();
+  const weighted = q.addExerciseToSession(session.id, 'Leg press');
+  assert.throws(() => p.savePyramidPlan(weighted.id, p.DEFAULT_PYRAMID));
+  assert.throws(() => p.addNextPyramidSet('unknown-exercise'));
+  const ex = q.addExerciseToSession(session.id, 'Traction');
+  assert.equal(p.getPyramidProgress(ex.id), null);
+  db.setUserSetting(`pyramid:${ex.id}`, 'broken JSON'); assert.equal(p.getPyramidPlan(ex.id), null);
+  db.setUserSetting(`pyramid:${ex.id}`, JSON.stringify({ ...p.DEFAULT_PYRAMID, runId: 'bad-run', enabled: true })); assert.equal(p.getPyramidPlan(ex.id), null);
+  assert.equal(p.parsePyramidSet('Notes anciennes'), null);
+  assert.equal(p.parsePyramidSet('pyramid:v1:abc:0:999'), null);
+  q.deleteSession(session.id);
+});
+test('Unperformed planned sets do not create records, chart points, or exercise progress', () => {
+  database.exec('SAVEPOINT draft_stats_test');
+  try {
+    const session = q.createSession();
+    const ex = q.addExerciseToSession(session.id, 'Draft-only test');
+    const draft = q.addSet(ex.id, 200, 0);
+    assert.equal(q.getExercisePersonalRecord(ex.name), 0);
+    assert.ok(!q.getPersonalRecords().some(record => record.name === ex.name));
+    assert.deepEqual(q.getWeightHistory(ex.name), []);
+    assert.deepEqual(q.getVolumeHistory(ex.name), []);
+    assert.deepEqual(q.getRepsHistory(ex.name), []);
+    const stats = q.getExerciseStats(ex.name);
+    assert.equal(stats.personalRecord, 0); assert.equal(stats.totalSessions, 0); assert.equal(stats.firstWeight, 0);
+    assert.ok(!q.getWeeklyReport().newRecords.some(record => record.exerciseName === ex.name));
+    q.updateSet(draft.id, 200, 8);
+    assert.equal(q.getExercisePersonalRecord(ex.name), 200);
+    assert.equal(q.getWeightHistory(ex.name)[0].value, 200);
+    assert.equal(q.getExerciseStats(ex.name).totalSessions, 1);
+    q.addSet(ex.id, 300, 0);
+    assert.equal(q.getExercisePersonalRecord(ex.name), 200);
+    assert.equal(q.getExerciseStats(ex.name).personalRecord, 200);
+    assert.equal(q.getWeightHistory(ex.name)[0].value, 200);
+  } finally { database.exec('ROLLBACK TO draft_stats_test; RELEASE draft_stats_test'); }
+});
+database.close();
+process.stdout.write(`${passed} regression checks passed.\n`);
