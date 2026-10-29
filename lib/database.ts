@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { notifyDataChanged } from './dataEvents';
 
 // ============================================================
 // Connexion à la base de données
@@ -144,6 +145,17 @@ function _initDatabase(db: SQLite.SQLiteDatabase): void {
     `);
     db.execSync('PRAGMA user_version = 3;');
   }
+
+  // Additive migration: machine notes belong to an exercise type, not a workout.
+  if (currentVersion < 4) {
+    db.withTransactionSync(() => {
+      db.execSync(`CREATE TABLE IF NOT EXISTS exercise_notes (
+        exercise_name TEXT PRIMARY KEY, note TEXT NOT NULL,
+        show_in_session INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL
+      );`);
+      db.execSync('PRAGMA user_version = 4;');
+    });
+  }
 }
 
 // ============================================================
@@ -184,7 +196,9 @@ export function resetAllData(): void {
     db.execSync('DELETE FROM custom_exercises;');
     db.execSync('DELETE FROM app_settings;');
     db.execSync('DELETE FROM user_settings;');
+    db.execSync('DELETE FROM exercise_notes;');
   });
+  notifyDataChanged();
 }
 
 /** Lit une préférence persistée depuis app_settings (ou null si jamais définie) */
@@ -205,6 +219,7 @@ export function setAppSetting(key: string, value: string): void {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     [key, value]
   );
+  notifyDataChanged();
 }
 
 /** Lit un paramètre utilisateur depuis user_settings (ou null si jamais défini) */
@@ -225,6 +240,7 @@ export function setUserSetting(key: string, value: string): void {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     [key, value]
   );
+  notifyDataChanged();
 }
 
 /** Génère un identifiant unique (UUID v4) */

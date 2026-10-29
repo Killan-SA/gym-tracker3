@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getProgramsForGoals } from '../lib/programs';
-import { completeOnboarding, parseBodyweight } from '../lib/onboarding';
+import { completeOnboarding, parseBodyweight, type InitialDataSource } from '../lib/onboarding';
 import { getUserBodyweight } from '../lib/queries';
 import { useSettingsStore } from '../store/settings';
 import { useProfileStore, cleanName } from '../store/profile';
@@ -14,7 +14,7 @@ import { GoalSelector } from './GoalSelector';
 import { fromKg, roundWeight } from '../lib/units';
 import { BrandMark } from './BrandMark';
 
-interface Props { visible: boolean; onComplete: (importExcel: boolean) => void; onDismiss: () => void }
+interface Props { visible: boolean; onComplete: (source: InitialDataSource) => void; onDismiss: () => void }
 
 export function Onboarding({ visible, onComplete, onDismiss }: Props) {
   const [step, setStep] = useState(0);
@@ -22,7 +22,8 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
   const [goals, setGoals] = useState<TrainingGoal[]>([]);
   const [program, setProgram] = useState<string | null | undefined>(undefined);
   const [weight, setWeight] = useState('');
-  const [importExcel, setImportExcel] = useState(false);
+  const [importSource, setImportSource] = useState<InitialDataSource>('none');
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const useKg = useSettingsStore(state => state.useKg);
   const saving = useRef(false);
 
@@ -34,8 +35,9 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
     setName(profile.name); setGoals(profile.goals);
     setProgram(settings.currentProgramId ?? undefined);
     setWeight(bodyweight > 0 ? String(roundWeight(fromKg(bodyweight, settings.useKg))) : '');
-    setStep(0); setImportExcel(false); saving.current = false;
+    setStep(0); setImportSource('none'); saving.current = false;
   }, [visible]);
+  useEffect(() => { scroll.current?.scrollTo({ y: 0, animated: false }); }, [step]);
 
   const next = () => {
     Keyboard.dismiss();
@@ -50,7 +52,7 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
     saving.current = true;
     try {
       completeOnboarding(program, kg, name, goals);
-      Keyboard.dismiss(); onComplete(importExcel);
+      Keyboard.dismiss(); onComplete(importSource);
     } catch (error) { saving.current = false; Alert.alert('Configuration', error instanceof Error ? error.message : 'Impossible de sauvegarder. Réessaie.'); }
   };
   const back = () => { Keyboard.dismiss(); setStep(value => Math.max(0, value - 1)); };
@@ -58,7 +60,7 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
   return <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onDismiss={onDismiss} onRequestClose={back}>
     <SafeAreaView style={s.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+        <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
           <BrandMark size={48} />
           <View style={s.progressRow}>{[0, 1, 2].map(index => <View key={index} style={[s.progressSegment, index <= step && { backgroundColor: COLORS.primary }]} />)}</View>
           <Text style={s.eyebrow}>FAISONS CONNAISSANCE · {step + 1}/3</Text>
@@ -95,7 +97,6 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
               <View style={{ flex: 1, gap: 7 }}><Text style={s.choiceTitle}>Entraînement libre</Text><Text style={s.small}>Je choisis mes exercices à chaque séance.</Text></View>
               <Ionicons name={program === null ? 'radio-button-on' : 'radio-button-off'} size={24} color={program === null ? COLORS.primary : COLORS.textMuted} />
             </TouchableOpacity>
-            <TouchableOpacity accessibilityRole="button" disabled={program === undefined} onPress={next} style={[s.primary, program === undefined && { opacity: 0.4 }]}><Text style={s.primaryLabel}>Continuer</Text><Ionicons name="arrow-forward" size={20} color={COLORS.background} /></TouchableOpacity>
           </>}
 
           {step === 2 && <>
@@ -106,15 +107,24 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
               <TextInput accessibilityLabel={`Poids corporel en ${useKg ? 'kg' : 'lbs'}`} value={weight} onChangeText={setWeight} placeholder={useKg ? '72,5' : '160'} placeholderTextColor={COLORS.textMuted} keyboardType="decimal-pad" inputAccessoryViewID="onboarding-weight" returnKeyType="done" onSubmitEditing={Keyboard.dismiss} style={s.weightInput} />
               <TouchableOpacity accessibilityLabel="Changer l’unité de poids" style={s.unit} onPress={() => { const previous = parseBodyweight(weight, useKg); if (previous !== null) setWeight(String(roundWeight(fromKg(previous, !useKg)))); else if (weight.trim()) setWeight(''); useSettingsStore.getState().setUseKg(!useKg); }}><Text style={s.choiceTitle}>{useKg ? 'kg' : 'lbs'} ↔</Text></TouchableOpacity>
             </View>
-            <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: importExcel }} onPress={() => { Keyboard.dismiss(); setImportExcel(!importExcel); }} style={s.choice}>
-              <Ionicons name={importExcel ? 'checkbox' : 'square-outline'} size={26} color={COLORS.primary} />
-              <View style={{ flex: 1, gap: 6 }}><Text style={s.choiceTitle}>J’ai un historique Excel</Text><Text style={s.small}>Importer mon fichier .xlsx ou .xls après la configuration.</Text></View>
-            </TouchableOpacity>
-            <TouchableOpacity accessibilityRole="button" style={s.primary} onPress={() => finish()}><Text style={s.primaryLabel}>{importExcel ? 'Continuer vers l’import Excel' : 'Ouvrir mon accueil'}</Text><Ionicons name="checkmark" size={22} color={COLORS.background} /></TouchableOpacity>
+            <Text style={s.sectionTitle}>As-tu déjà des données ?</Text>
+            {([
+              { value: 'none', title: 'Je commence sans historique', description: 'Créer mes premières séances dans GymTracker.' },
+              { value: 'excel', title: 'J’ai un historique Excel', description: 'Importer un fichier .xlsx ou .xls après la configuration.' },
+              { value: 'backup', title: 'J’ai une ancienne sauvegarde GymTracker', description: 'Restaurer mes séances, mes notes et mes réglages depuis un fichier .json.' },
+            ] as const).map(option => <TouchableOpacity key={option.value} accessibilityRole="radio" accessibilityState={{ checked: importSource === option.value }} onPress={() => { Keyboard.dismiss(); setImportSource(option.value); }} style={[s.choice, importSource === option.value && s.selected]}>
+              <Ionicons name={importSource === option.value ? 'radio-button-on' : 'radio-button-off'} size={26} color={COLORS.primary} />
+              <View style={{ flex: 1, gap: 6 }}><Text style={s.choiceTitle}>{option.title}</Text><Text style={s.small}>{option.description}</Text></View>
+            </TouchableOpacity>)}
+            <TouchableOpacity accessibilityRole="button" style={s.primary} onPress={() => finish()}><Text style={s.primaryLabel}>{importSource === 'excel' ? 'Continuer vers l’import Excel' : importSource === 'backup' ? 'Continuer vers ma sauvegarde' : 'Ouvrir mon accueil'}</Text><Ionicons name="checkmark" size={22} color={COLORS.background} /></TouchableOpacity>
             <TouchableOpacity style={s.later} onPress={() => finish(true)}><Text style={s.small}>Renseigner mon poids plus tard</Text></TouchableOpacity>
             <Text style={s.privacy}>Sans compte · Sans publicité · Données locales</Text>
           </>}
         </ScrollView>
+        {step === 1 && <View style={s.fixedFooter}>
+          <Text numberOfLines={2} style={s.small}>{program === undefined ? 'Choisis un programme ou le mode libre.' : program === null ? 'Entraînement libre sélectionné' : getProgramsForGoals(goals).find(p => p.id === program)?.name}</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: program === undefined }} disabled={program === undefined} onPress={next} style={[s.primary, program === undefined && { opacity: 0.4 }]}><Text style={s.primaryLabel}>Continuer</Text><Ionicons name="arrow-forward" size={20} color={COLORS.background} /></TouchableOpacity>
+        </View>}
         <KeyboardDoneAccessory id="onboarding-weight" />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -122,6 +132,7 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
 }
 
 const s = StyleSheet.create({
+  fixedFooter: { backgroundColor: COLORS.background, borderTopWidth: 1, borderColor: COLORS.cardBorder, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 12, gap: 4 },
   safe: { flex: 1, backgroundColor: COLORS.background }, content: { padding: 24, paddingBottom: 32, gap: 14 }, brand: { color: COLORS.primary, fontSize: 15, fontWeight: '900', letterSpacing: 3, marginBottom: 10 },
   progressRow: { flexDirection: 'row', gap: 7, marginBottom: 8 }, progressSegment: { flex: 1, height: 4, borderRadius: 3, backgroundColor: COLORS.cardBorder }, eyebrow: { color: COLORS.textMuted, fontSize: 10, letterSpacing: 1.5, fontWeight: '700' },
   title: { color: COLORS.textPrimary, fontSize: 32, fontWeight: '900', letterSpacing: -1 }, sectionTitle: { color: COLORS.textPrimary, fontSize: 20, fontWeight: '700', marginTop: 16 }, description: { color: COLORS.textSecondary, fontSize: 14, lineHeight: 22, marginBottom: 8 },

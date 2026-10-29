@@ -15,15 +15,21 @@ database.exec(`
   INSERT INTO sets VALUES ('legacy-set', 'legacy-ex', 1, 80, 8, NULL);
 `);
 const params = args => Array.isArray(args[0]) ? args[0] : args;
+let inAppTransaction = false;
 const adapter = {
   execSync: sql => database.exec(sql),
   runSync: (sql, ...args) => database.prepare(sql).run(...params(args)),
   getFirstSync: (sql, ...args) => database.prepare(sql).get(...params(args)) ?? null,
   getAllSync: (sql, ...args) => database.prepare(sql).all(...params(args)),
   withTransactionSync: fn => {
+    // Expo uses BEGIN/COMMIT: nested withTransactionSync is not supported.
+    // Test isolation uses an outer SAVEPOINT, independent of application calls.
+    if (inAppTransaction) throw new Error('Nested Expo transaction');
+    inAppTransaction = true;
     database.exec('SAVEPOINT expo_transaction');
     try { fn(); database.exec('RELEASE expo_transaction'); }
     catch (error) { database.exec('ROLLBACK TO expo_transaction; RELEASE expo_transaction;'); throw error; }
+    finally { inAppTransaction = false; }
   },
 };
 const originalLoad = Module._load;
@@ -42,7 +48,7 @@ test('Legacy SQLite migration preserves workout rows and adds optional RPE', () 
   assert.equal(session.notes, 'Mes anciennes données');
   assert.equal(session.exercises[0].sets[0].weight, 80);
   assert.equal(session.exercises[0].sets[0].rpe, null);
-  assert.equal(database.prepare('PRAGMA user_version').get().user_version, 3);
+  assert.equal(database.prepare('PRAGMA user_version').get().user_version, 4);
 });
 let session, exercise, set;
 test('Existing session, custom exercise and RPE CRUD work', () => {
@@ -409,6 +415,183 @@ test('Unperformed planned sets do not create records, chart points, or exercise 
     assert.equal(q.getExerciseStats(ex.name).personalRecord, 200);
     assert.equal(q.getWeightHistory(ex.name)[0].value, 200);
   } finally { database.exec('ROLLBACK TO draft_stats_test; RELEASE draft_stats_test'); }
+});
+const features = require('../lib/sessionFeatures.ts');
+const alternatives = require('../lib/exerciseAlternatives.ts');
+const weekly = require('../lib/weeklyConsistency.ts');
+const timer = require('../lib/restTimer.ts');
+const backup = require('../lib/backup.ts');
+const { useRestTimerStore } = require('../store/restTimerStore.ts');
+function isolated(fn) { database.exec('SAVEPOINT feature_test'); try { fn(); } finally { database.exec('ROLLBACK TO feature_test; RELEASE feature_test'); } }
+
+test('Persistent machine notes support creation, editing, accents, visibility and deletion', () => isolated(() => {
+  features.setPersistentExerciseNote('Élévations latérales', 'Banc à 30°');
+  assert.equal(features.getPersistentExerciseNote('elevations LATERALES').note, 'Banc à 30°');
+  features.setPersistentExerciseNote('elevations laterales', 'Siège 4', false);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM exercise_notes').get().n, 1);
+  assert.equal(features.getPersistentExerciseNote('Élévations latérales').show_in_session, 0);
+  features.deletePersistentExerciseNote('ELEVATIONS LATERALES');
+  assert.equal(features.getPersistentExerciseNote('Élévations latérales'), null);
+}));
+test('Session notes stay separate from persistent machine notes', () => isolated(() => {
+  const s = q.createSession(); const ex = q.addExerciseToSession(s.id, 'Lat pulldown');
+  features.setPersistentExerciseNote(ex.name, 'Siège 4'); features.setSessionExerciseNote(ex.id, 'Fatigué aujourd’hui');
+  assert.equal(q.getSessionWithExercises(s.id).exercises[0].notes, 'Fatigué aujourd’hui');
+  assert.equal(features.getPersistentExerciseNote(ex.name).note, 'Siège 4');
+}));
+test('Reordering five exercises from fifth to first persists contiguous indices', () => isolated(() => {
+  const s = q.createSession(); const rows = Array.from({ length: 5 }, (_, i) => q.addExerciseToSession(s.id, `Machine ${i}`));
+  const ids = [rows[4].id, ...rows.slice(0, 4).map(ex => ex.id)];
+  features.reorderExercises(s.id, ids);
+  const loaded = q.getSessionWithExercises(s.id).exercises;
+  assert.deepEqual(loaded.map(ex => ex.id), ids); assert.deepEqual(loaded.map(ex => ex.order_index), [0, 1, 2, 3, 4]);
+}));
+test('Reordering rejects duplicates, foreign exercises and incomplete lists without changes', () => isolated(() => {
+  const s = q.createSession(); const a = q.addExerciseToSession(s.id, 'A'); const b = q.addExerciseToSession(s.id, 'B');
+  for (const ids of [[a.id], [a.id, a.id], [a.id, 'foreign']]) assert.throws(() => features.reorderExercises(s.id, ids));
+  assert.deepEqual(q.getSessionWithExercises(s.id).exercises.map(ex => ex.id), [a.id, b.id]);
+}));
+test('Replacement ranks matching vertical pulls above horizontal rows', () => {
+  const rows = alternatives.getExerciseAlternatives('Lat pulldown');
+  assert.ok(rows.findIndex(row => row.name === 'Traction assistée') < rows.findIndex(row => row.name === 'Seated row'));
+  assert.ok(rows.find(row => row.name === 'Traction').score >= 9);
+  assert.ok(rows.every(row => row.name !== 'Lat pulldown'));
+});
+test('Custom and unknown exercise replacement fallbacks work locally', () => {
+  const custom = { name: 'Tirage personnel', category: 'Dos' };
+  assert.ok(alternatives.getExerciseAlternatives(custom.name, [custom]).length > 0);
+  assert.deepEqual(alternatives.getExerciseAlternatives('Inconnu'), []);
+});
+test('Replacement renames an empty exercise without altering existing history', () => isolated(() => {
+  const s = q.createSession(); const ex = q.addExerciseToSession(s.id, 'Lat pulldown'); q.addSet(ex.id, 90, 0);
+  features.replaceSessionExercise(s.id, ex.id, 'Traction');
+  const loaded = q.getSessionWithExercises(s.id).exercises[0];
+  assert.equal(loaded.id, ex.id); assert.equal(loaded.name, 'Traction'); assert.equal(loaded.sets.length, 0);
+}));
+test('Replacing completed work inserts an alternative after it and preserves all performed sets', () => isolated(() => {
+  const s = q.createSession(); const ex = q.addExerciseToSession(s.id, 'Lat pulldown'); const next = q.addExerciseToSession(s.id, 'Curl haltère');
+  const done = q.addSet(ex.id, 80, 8, 9); const draft = q.addSet(ex.id, 80, 0);
+  const replacementId = features.replaceSessionExercise(s.id, ex.id, 'Traction', 'remaining');
+  const loaded = q.getSessionWithExercises(s.id).exercises;
+  assert.deepEqual(loaded.map(row => row.id), [ex.id, replacementId, next.id]);
+  assert.equal(loaded[0].name, 'Lat pulldown'); assert.equal(loaded[0].sets[0].id, done.id); assert.equal(loaded[0].sets[0].weight, 80);
+  assert.equal(loaded[1].sets[0].id, draft.id); assert.equal(loaded[1].sets[0].weight, 0);
+  assert.equal(q.getSessionVolume(s.id), 640);
+}));
+test('Keeping an exercise during replacement preserves even its empty drafts', () => isolated(() => {
+  const s = q.createSession(); const ex = q.addExerciseToSession(s.id, 'Lat pulldown'); q.addSet(ex.id, 80, 8); q.addSet(ex.id, 80, 0);
+  features.replaceSessionExercise(s.id, ex.id, 'Traction', 'keep');
+  const loaded = q.getSessionWithExercises(s.id).exercises;
+  assert.equal(loaded[0].sets.length, 2); assert.equal(loaded[1].sets.length, 0);
+}));
+test('Weekly consistency allows an unfinished current week without losing previous regular weeks', () => {
+  const now = new Date(2026, 9, 29, 12);
+  const dates = [12, 13, 14, 19, 20, 21, 26, 27].map(day => new Date(2026, 9, day, 12).toISOString());
+  assert.deepEqual(weekly.calculateWeeklyConsistency(dates, 3, now), { target: 3, currentWeekCount: 2, streakWeeks: 2, completedThisWeek: false });
+  assert.equal(weekly.calculateWeeklyConsistency(dates, 2, now).streakWeeks, 3);
+  assert.equal(weekly.calculateWeeklyConsistency(dates, 4, now).streakWeeks, 0);
+});
+test('Weekly consistency uses Monday boundaries, skips future dates and breaks on missed weeks', () => {
+  const dates = [5, 6, 7, 19, 20, 21, 26, 27, 28, 31].map(day => new Date(2026, 9, day, 12).toISOString());
+  const result = weekly.calculateWeeklyConsistency(dates, 3, new Date(2026, 9, 29, 12));
+  assert.equal(result.currentWeekCount, 3); assert.equal(result.streakWeeks, 2);
+  assert.equal(weekly.weekStart(new Date(2026, 9, 25, 12)).getDate(), 19);
+});
+test('Weekly SQL count excludes empty workouts and counts bodyweight and imported sessions', () => isolated(() => {
+  db.resetAllData(); const empty = q.createSession(); const done = q.createSession(); const ex = q.addExerciseToSession(done.id, 'Pompes'); q.addSet(ex.id, 0, 10);
+  const result = weekly.getWeeklyConsistency(new Date(Date.now() + 1000));
+  assert.equal(result.currentWeekCount, 1); weekly.setWeeklyGoal(4); assert.equal(weekly.getWeeklyGoal(), 4);
+  assert.throws(() => weekly.setWeeklyGoal(0));
+}));
+test('Rest timer uses a real deadline across background time and rounds partial seconds up', () => {
+  const state = timer.createRestTimer({ duration: 90, sessionId: 's', exerciseId: 'e', exerciseName: 'Pompes', setNumber: 1, weight: 0, reps: 10 }, 1000);
+  assert.equal(state.endTime, 91000); assert.equal(timer.secondsRemaining(state, 20200), 71);
+  assert.equal(timer.secondsRemaining(state, 90000), 1); assert.equal(timer.secondsRemaining(state, 120000), 0);
+  assert.equal(timer.secondsRemaining(timer.adjustRestTimer(state, 30, 20200), 20200), 101);
+  assert.equal(timer.secondsRemaining(timer.adjustRestTimer(state, -15, 90000), 90000), 0);
+});
+test('Rest store replaces concurrent timers, persists, completes once, changes duration and skips', () => isolated(() => {
+  const context = { duration: 90, sessionId: 's', exerciseId: 'e', exerciseName: 'Pompes', setNumber: 1, weight: 0, reps: 10 };
+  useRestTimerStore.getState().start(context); useRestTimerStore.getState().start({ ...context, exerciseName: 'Traction' });
+  assert.equal(useRestTimerStore.getState().timer.exerciseName, 'Traction');
+  const end = useRestTimerStore.getState().timer.endTime; useRestTimerStore.getState().adjust(30);
+  assert.equal(useRestTimerStore.getState().timer.endTime, end + 30000);
+  useRestTimerStore.getState().preset(60); assert.equal(useRestTimerStore.getState().timer.duration, 60);
+  useRestTimerStore.setState({ timer: null }); useRestTimerStore.getState().hydrate(); assert.equal(useRestTimerStore.getState().timer.duration, 60);
+  assert.equal(useRestTimerStore.getState().complete(), true); assert.equal(useRestTimerStore.getState().complete(), false);
+  useRestTimerStore.getState().stop(); assert.equal(useRestTimerStore.getState().timer, null);
+}));
+test('Complete backup roundtrip preserves sessions, notes, settings, favorites and pyramids', () => isolated(() => {
+  features.setPersistentExerciseNote('Lat pulldown', 'Siège 3');
+  db.setUserSetting('favorite_exercises', '["Pompes"]'); db.setUserSetting('pyramid:example', '{"enabled":true}');
+  const exported = backup.createBackup(); const decoded = JSON.parse(JSON.stringify(exported));
+  assert.equal(backup.validateBackup(decoded).version, 1);
+  db.resetAllData(); assert.equal(q.getAllSessions().length, 0); backup.restoreBackup(decoded);
+  assert.equal(q.getAllSessions().length, exported.sessions.length);
+  assert.equal(features.getPersistentExerciseNote('Lat pulldown').note, 'Siège 3');
+  assert.equal(db.getUserSetting('pyramid:example'), '{"enabled":true}');
+  assert.deepEqual(backup.createBackup().sets, exported.sets);
+}));
+test('Backup rejects corrupt documents, wrong versions, missing tables and invalid values before writes', () => isolated(() => {
+  const exported = JSON.parse(JSON.stringify(backup.createBackup()));
+  assert.throws(() => backup.restoreBackup('broken')); assert.throws(() => backup.restoreBackup({ ...exported, version: 2 }));
+  const incomplete = { ...exported }; delete incomplete.settings; assert.throws(() => backup.restoreBackup(incomplete));
+  const invalid = structuredClone(exported); invalid.sets[0].weight = -1; assert.throws(() => backup.restoreBackup(invalid));
+  const orphan = structuredClone(exported); orphan.exercises[0].session_id = 'missing'; assert.throws(() => backup.restoreBackup(orphan));
+  assert.equal(q.getAllSessions().length, exported.sessions.length);
+}));
+test('Restoration rolls back every table if SQLite fails after deleting the current data', () => isolated(() => {
+  const exported = backup.createBackup(); const before = JSON.stringify({ ...exported, createdAt: '' });
+  const originalRun = adapter.runSync; let inserts = 0;
+  adapter.runSync = (sql, ...args) => { if (sql.startsWith('INSERT INTO') && ++inserts === 2) throw new Error('Simulated disk failure'); return originalRun(sql, ...args); };
+  try { assert.throws(() => backup.restoreBackup(exported), /disk failure/); }
+  finally { adapter.runSync = originalRun; }
+  assert.equal(JSON.stringify({ ...backup.createBackup(), createdAt: '' }), before);
+}));
+test('Reset removes machine notes and a backup excludes the temporary active timer', () => isolated(() => {
+  features.setPersistentExerciseNote('Pompes', 'Prise'); db.setUserSetting('active_rest_timer', '{}');
+  assert.ok(!backup.createBackup().settings.some(row => row.key === 'active_rest_timer'));
+  db.resetAllData(); assert.equal(features.getPersistentExerciseNote('Pompes'), null);
+}));
+test('Widget summary reads the next program day and weekly goal from local data', () => isolated(() => {
+  const { getWidgetSummary } = require('../lib/widgetSummary.ts');
+  const { TRAINING_PROGRAMS } = require('../lib/programs.ts');
+  useSettingsStore.getState().setCurrentProgram(TRAINING_PROGRAMS[0].id); weekly.setWeeklyGoal(4);
+  const summary = getWidgetSummary();
+  assert.equal(summary.nextWorkout, TRAINING_PROGRAMS[0].days[0].label); assert.equal(summary.weeklyGoal, 4);
+}));
+test('Drag geometry handles variable-height cards in both directions and persists work unchanged', () => isolated(() => {
+  const drag = require('../lib/exerciseDrag.ts');
+  const layouts = new Map([[0, { y: 140, height: 300 }], [1, { y: 440, height: 600 }], [2, { y: 1040, height: 400 }], [3, { y: 1440, height: 200 }], [4, { y: 1640, height: 500 }]]);
+  assert.equal(drag.getExerciseDropIndex(layouts, 4, -1600, 5), 0);
+  assert.equal(drag.getExerciseDropIndex(layouts, 0, 1600, 5), 4);
+  assert.equal(drag.getExerciseDropIndex(layouts, 1, 100000, 5), 4);
+  assert.equal(drag.getExerciseDropIndex(layouts, 1, -100000, 5), 0);
+  const s = q.createSession(); const exercises = Array.from({ length: 5 }, (_, i) => q.addExerciseToSession(s.id, `Exercice ${i}`));
+  const set = q.addSet(exercises[4].id, 45, 8, 7); features.setSessionExerciseNote(exercises[4].id, 'Ma configuration');
+  const moved = drag.moveExerciseItem(exercises, 4, drag.getExerciseDropIndex(layouts, 4, -1600, 5));
+  features.reorderExercises(s.id, moved.map(row => row.id));
+  const loaded = q.getSessionWithExercises(s.id);
+  assert.equal(loaded.exercises[0].id, exercises[4].id);
+  assert.equal(loaded.exercises[0].sets[0].id, set.id); assert.equal(loaded.exercises[0].sets[0].weight, 45);
+  assert.equal(loaded.exercises[0].notes, 'Ma configuration'); assert.equal(q.getSessionVolume(s.id), 360);
+}));
+test('Dragging preserves the input list, retains every item, and rejects stale destinations', () => {
+  const drag = require('../lib/exerciseDrag.ts'); const original = ['a', 'b', 'c', 'd', 'e'];
+  assert.deepEqual(drag.moveExerciseItem(original, 4, 0), ['e', 'a', 'b', 'c', 'd']);
+  assert.deepEqual(drag.moveExerciseItem(original, 0, 4), ['b', 'c', 'd', 'e', 'a']);
+  assert.deepEqual(original, ['a', 'b', 'c', 'd', 'e']);
+  assert.throws(() => drag.moveExerciseItem(original, 5, 0));
+  assert.equal(drag.getExerciseDropIndex(new Map(), 2, 100, 5), 2);
+});
+test('Visible replacement scores distinguish movements and expose limited custom metadata', () => {
+  const exact = alternatives.getExerciseReplacementScore('Lat pulldown', { name: 'Traction assistée', category: 'Dos' });
+  const row = alternatives.getExerciseReplacementScore('Lat pulldown', { name: 'Seated row', category: 'Dos' });
+  assert.equal(exact.score, 12); assert.equal(exact.scoreDetails.length, 4); assert.equal(row.score, 7);
+  const custom = { name: 'Ma machine', category: 'Dos' };
+  assert.equal(alternatives.getExerciseReplacementScore(custom.name, { name: 'Lat pulldown', category: 'Dos' }, [custom]).score, 2);
+  assert.equal(alternatives.getExerciseReplacementScore('Inconnu', custom).score, null);
+  assert.ok(alternatives.getExerciseAlternatives('Lat pulldown').every(row => row.score <= alternatives.MAX_REPLACEMENT_SCORE));
 });
 database.close();
 process.stdout.write(`${passed} regression checks passed.\n`);

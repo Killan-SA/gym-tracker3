@@ -7,6 +7,10 @@ import { useProfileStore, cleanName } from '../store/profile';
 import type { TrainingGoal } from '../constants/goals';
 
 const KEY = 'onboarding_v1';
+export type InitialDataSource = 'none' | 'excel' | 'backup';
+export function getInitialDataImportRoute(source: InitialDataSource): '/import' | '/restore' | null {
+  return source === 'excel' ? '/import' : source === 'backup' ? '/restore' : null;
+}
 
 export function needsOnboarding(): boolean {
   const status = getUserSetting(KEY);

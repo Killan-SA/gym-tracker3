@@ -7,16 +7,21 @@ import {
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Modal,
   SectionList,
   ScrollView,
   Vibration,
   Animated,
-  AppState,
 } from 'react-native';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
+import DraggableFlatList from '../../components/DraggableExerciseList';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ExerciseTools } from '../../components/ExerciseTools';
+import { reorderExercises } from '../../lib/sessionFeatures';
+import { useRestTimerStore } from '../../store/restTimerStore';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardDoneAccessory } from '../../components/KeyboardDoneAccessory';
 import { PyramidControls } from '../../components/PyramidControls';
@@ -67,41 +72,26 @@ export default function SessionScreen() {
 
   // ── Chrono de repos entre les séries ──
   const [restDuration, setRestDuration] = useState(90); // durée par défaut, mémorisée pour la séance
-  const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
-  const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const restDeadline = useRef<number | null>(null);
+  const rest = useRestTimerStore(state => state.timer);
+  const [lastValidated, setLastValidated] = useState<{ exercise: ExerciseWithSets; set: Set } | null>(null);
+  const openingRest = useRef(false);
   const sessionStarted = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
   const insets = useSafeAreaInsets();
-  const tickRest = useCallback(() => {
-    if (restDeadline.current === null) return;
-    const remaining = Math.max(0, Math.ceil((restDeadline.current - Date.now()) / 1000));
-    setRestSecondsLeft(remaining);
-    if (remaining === 0) {
-      restDeadline.current = null;
-      if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-      restIntervalRef.current = null;
-      Vibration.vibrate([0, 200, 100, 200, 100, 400]);
-    }
-  }, []);
-  const startRestTimer = useCallback((duration: number) => {
-    if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-    restDeadline.current = Date.now() + duration * 1000;
-    setRestSecondsLeft(duration);
-    restIntervalRef.current = setInterval(tickRest, 250);
-  }, [tickRest]);
-  const stopRestTimer = useCallback(() => {
-    if (restIntervalRef.current) clearInterval(restIntervalRef.current);
-    restIntervalRef.current = null;
-    restDeadline.current = null;
-    setRestSecondsLeft(null);
-  }, []);
+  const stopRestTimer = useRestTimerStore(state => state.stop);
+  const openRest = (exercise?: ExerciseWithSets, set?: Set) => {
+    if (openingRest.current || !id) return;
+    openingRest.current = true;
+    const targetExercise = exercise ?? lastValidated?.exercise;
+    const targetSet = set ?? lastValidated?.set;
+    useRestTimerStore.getState().start({ duration: restDuration, sessionId: id, exerciseId: targetExercise?.id ?? '', exerciseName: targetExercise?.name ?? 'Séance', setNumber: targetSet?.set_number ?? 0, weight: targetSet?.weight ?? 0, reps: targetSet?.reps ?? 0 });
+    router.push('/rest');
+    setTimeout(() => { openingRest.current = false; }, 800);
+  };
   useEffect(() => {
     const elapsedInterval = setInterval(() => setElapsed(Math.floor((Date.now() - sessionStarted.current) / 1000)), 1000);
-    const subscription = AppState.addEventListener('change', state => { if (state === 'active') tickRest(); });
-    return () => { clearInterval(elapsedInterval); subscription.remove(); if (restIntervalRef.current) clearInterval(restIntervalRef.current); };
-  }, [tickRest]);
+    return () => clearInterval(elapsedInterval);
+  }, []);
 
   const loadSession = useCallback(() => {
     if (!id) return;
@@ -230,7 +220,7 @@ export default function SessionScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <GestureHandlerRootView style={{ flex: 1 }}><KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
@@ -240,14 +230,16 @@ export default function SessionScreen() {
           onDone={() => setPrCelebration(null)}
         />
       )}
-      <FlatList
+      <DraggableFlatList
         data={exercises}
+        onDragBegin={() => { Keyboard.dismiss(); Vibration.vibrate(30); }}
+        onDragEnd={({ data }) => { try { reorderExercises(id!, data.map(row => row.id)); setExercises(data); } catch (error) { Alert.alert('Ordre des exercices', String(error)); loadSession(); } }}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: restSecondsLeft !== null ? 200 + insets.bottom : 50 + insets.bottom }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 50 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
-        renderItem={({ item }) => (
+        renderItem={({ item, dragHandle, isActive }) => (
           <ExerciseCard
             exercise={item}
             onAddSet={() => handleAddSet(item.id, item.name)}
@@ -255,13 +247,12 @@ export default function SessionScreen() {
             onDeleteExercise={() => handleDeleteExercise(item.id, item.name)}
             onReload={loadSession}
             onNewRecord={handleNewRecord}
-            restSecondsLeft={restSecondsLeft}
-            restDuration={restDuration}
-            onStartRest={(dur) => startRestTimer(dur)}
-            onChangeDuration={(dur) => setRestDuration(dur)}
+            dragHandle={dragHandle}
+            isDragging={isActive}
+            onValidated={(set) => { setLastValidated({ exercise: item, set }); if (getUserSetting('auto_rest') === '1') openRest(item, set); }}
           />
         )}
-        ListHeaderComponent={<><View style={styles.sessionHeader}><View><Text style={styles.sessionLabel}>{getSessionTitle(id ?? '')}</Text><Text style={styles.sessionMeta}>{exercises.length} exercices · {exercises.reduce((n, e) => n + e.sets.length, 0)} séries</Text></View><Text style={styles.elapsed}>{Math.floor(elapsed / 60).toString().padStart(2, '0')}:{(elapsed % 60).toString().padStart(2, '0')}</Text></View>{exercises.length === 0 && <EmptySession />}</>}
+        ListHeaderComponent={<><View style={styles.sessionHeader}><View><Text style={styles.sessionLabel}>{getSessionTitle(id ?? '')}</Text><Text style={styles.sessionMeta}>{exercises.length} exercices · {exercises.reduce((n, e) => n + e.sets.length, 0)} séries</Text></View><Text style={styles.elapsed}>{Math.floor(elapsed / 60).toString().padStart(2, '0')}:{(elapsed % 60).toString().padStart(2, '0')}</Text></View><View style={{ gap: 12, marginBottom: 18 }}><TouchableOpacity onPress={() => openRest()} style={cardStyles.restBtn}><Text style={cardStyles.restBtnText}>{lastValidated ? 'Série validée ✓ · ' : ''}Repos {restDuration} s →</Text></TouchableOpacity><View style={{ flexDirection: 'row', gap: 14 }}>{[60, 90, 120, 180].map(duration => <TouchableOpacity key={duration} onPress={() => setRestDuration(duration)} style={cardStyles.presetPill}><Text style={{ color: duration === restDuration ? COLORS.primary : COLORS.textSecondary }}>{duration} s</Text></TouchableOpacity>)}</View>{rest?.sessionId === id && <TouchableOpacity onPress={() => router.push('/rest')}><Text style={{ color: COLORS.primary }}>Reprendre le repos en cours →</Text></TouchableOpacity>}</View>{exercises.length === 0 && <EmptySession />}</>}
         ListFooterComponent={
           <View style={styles.footer}>
             <TouchableOpacity
@@ -283,17 +274,6 @@ export default function SessionScreen() {
           </View>
         }
       />
-
-      {/* ── Chrono de repos ─────────────────────────────────── */}
-      {restSecondsLeft !== null && (
-        <RestTimerBar
-          secondsLeft={restSecondsLeft}
-          totalSeconds={restDuration}
-          onSkip={stopRestTimer}
-          bottomInset={insets.bottom}
-          onAddSeconds={(seconds) => { const next = (restSecondsLeft ?? 0) + seconds; startRestTimer(next); }}
-        />
-      )}
 
       {/* ── Modal sélecteur d'exercice ─────────────────────── */}
       <Modal
@@ -457,7 +437,7 @@ export default function SessionScreen() {
         </View>
       </Modal>
       <KeyboardDoneAccessory id="session-set-input" />
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingView></GestureHandlerRootView>
   );
 }
 
@@ -472,10 +452,9 @@ function ExerciseCard({
   onDeleteExercise,
   onReload,
   onNewRecord,
-  restSecondsLeft,
-  restDuration,
-  onStartRest,
-  onChangeDuration,
+  dragHandle,
+  isDragging,
+  onValidated,
 }: {
   exercise: ExerciseWithSets;
   onAddSet: () => void;
@@ -483,10 +462,9 @@ function ExerciseCard({
   onDeleteExercise: () => void;
   onReload: () => void;
   onNewRecord: (exerciseName: string, weight: number) => void;
-  restSecondsLeft: number | null;
-  restDuration: number;
-  onStartRest: (duration: number) => void;
-  onChangeDuration: (duration: number) => void;
+  dragHandle: React.ReactNode;
+  isDragging: boolean;
+  onValidated: (set: Set) => void;
 }) {
   // Record connu AVANT toute modification dans cette carte (recalculé à chaque reload)
   const recordSoFar = getExercisePersonalRecord(exercise.name);
@@ -498,16 +476,15 @@ function ExerciseCard({
   const pyramidEnabled = isBodyweight && (getPyramidPlan(exercise.id)?.enabled ?? false);
 
   return (
-    <View style={cardStyles.container}>
+    <View style={[cardStyles.container, isDragging && { opacity: 0.8, borderColor: COLORS.primary }]}>
       <View style={cardStyles.header}>
-        <Ionicons name="barbell" size={18} color={COLORS.primary} />
+        {dragHandle}
         <Text style={cardStyles.name}>{exercise.name}</Text>
-        <TouchableOpacity onPress={onDeleteExercise} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-        </TouchableOpacity>
+
       </View>
 
       <Text style={cardStyles.category}>{getExerciseCategory(exercise.name)}</Text>
+      <ExerciseTools exercise={exercise} onReload={onReload} onDelete={onDeleteExercise} />
       <ExerciseVisual name={exercise.name} large />
       <View style={cardStyles.performance}><View style={{ flex: 1 }}><Text style={cardStyles.performanceLabel}>DERNIÈRE FOIS</Text><Text style={cardStyles.performanceValue}>{previous ? formatWeight(previous.weight, useKg) + ' × ' + previous.reps : 'Première séance'}</Text></View><View style={{ flex: 1 }}><Text style={cardStyles.performanceLabel}>OBJECTIF SUGGÉRÉ</Text><Text style={[cardStyles.performanceValue, { color: COLORS.primary }]}>{target ? formatWeight(target.weight, useKg) + ' × ' + target.reps : 'Trouve ton rythme'}</Text></View></View>
       {isBodyweight && <PyramidControls exerciseId={exercise.id} onReload={onReload} />}
@@ -525,6 +502,7 @@ function ExerciseCard({
           <SetRow
             set={set}
             targetReps={parsePyramidSet(set.notes)?.targetReps}
+            onValidated={onValidated}
             personalRecord={recordSoFar}
             onDelete={() => onDeleteSet(set.id)}
             onReload={onReload}
@@ -534,59 +512,6 @@ function ExerciseCard({
         </View>
       ))}
 
-
-          <View style={cardStyles.restRow}>
-            <TouchableOpacity
-              style={[
-                cardStyles.restBtn,
-                restSecondsLeft !== null && cardStyles.restBtnActive,
-              ]}
-              onPress={() => onStartRest(restDuration)}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={restSecondsLeft !== null ? 'time' : 'timer-outline'}
-                size={14}
-                color={restSecondsLeft !== null ? COLORS.warning : COLORS.primary}
-              />
-              <Text
-                style={[
-                  cardStyles.restBtnText,
-                  restSecondsLeft !== null && { color: COLORS.warning, fontWeight: '700' },
-                ]}
-              >
-                {restSecondsLeft !== null
-                  ? `Repos : ${Math.floor(restSecondsLeft / 60)}:${(restSecondsLeft % 60).toString().padStart(2, '0')}`
-                  : `Temps de repos (${Math.floor(restDuration / 60)}m${restDuration % 60 > 0 ? (restDuration % 60) + 's' : ''})`}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={cardStyles.presetPills}>
-              {[60, 90, 120, 180].map((sec) => (
-                <TouchableOpacity
-                  key={sec}
-                  style={[
-                    cardStyles.presetPill,
-                    restDuration === sec && cardStyles.presetPillActive,
-                  ]}
-                  onPress={() => {
-                    onChangeDuration(sec);
-                    onStartRest(sec);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      cardStyles.presetPillText,
-                      restDuration === sec && cardStyles.presetPillTextActive,
-                    ]}
-                  >
-                    {sec === 60 ? '1m' : sec === 90 ? '1m30' : sec === 120 ? '2m' : '3m'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
 
       {exercise.sets.length === 0 && !pyramidEnabled && (
         <Text style={cardStyles.noSets}>Ajoute une première série 👇</Text>
@@ -604,8 +529,8 @@ function ExerciseCard({
 // SetRow
 // ============================================================
 
-function SetRow({ set, personalRecord, onDelete, onReload, onNewRecord, targetReps }: {
-  set: Set; personalRecord: number; onDelete: () => void; onReload: () => void; onNewRecord: (weight: number) => void; targetReps?: number;
+function SetRow({ set, personalRecord, onDelete, onReload, onNewRecord, targetReps, onValidated }: {
+  set: Set; personalRecord: number; onDelete: () => void; onReload: () => void; onNewRecord: (weight: number) => void; targetReps?: number; onValidated: (set: Set) => void;
 }) {
   const useKg = useSettingsStore(state => state.useKg);
   const [weight, setWeight] = useState(set.weight > 0 ? String(roundWeight(fromKg(set.weight, useKg))) : '');
@@ -631,6 +556,7 @@ function SetRow({ set, personalRecord, onDelete, onReload, onNewRecord, targetRe
     if (changed) { updateSet(set.id, kg, repetitions, effort); saved.current = { weight: kg, reps: repetitions, rpe: effort }; if (kg > personalRecord && repetitions > 0) onNewRecord(kg); }
     if (validate) { setReps(String(repetitions)); setConfirmed(true); setUserSetting('set_confirmed:' + set.id, '1'); Vibration.vibrate(35); }
     if (changed || validate) onReload();
+    if (validate && !confirmed) onValidated({ ...set, weight: kg, reps: repetitions, rpe: effort });
   };
   const invalidate = () => { if (confirmed) { setConfirmed(false); setUserSetting('set_confirmed:' + set.id, '0'); } };
   return <View style={[setRowStyles.row, confirmed && { backgroundColor: COLORS.primaryGlow, borderRadius: 12 }]}>
@@ -692,64 +618,6 @@ function PRCelebrationBanner({
     </Animated.View>
   );
 }
-
-// ============================================================
-// RestTimerBar — chrono de repos flottant
-// ============================================================
-
-function RestTimerBar({
-  secondsLeft,
-  totalSeconds,
-  onSkip,
-  onAddSeconds,
-  bottomInset,
-}: {
-  secondsLeft: number;
-  totalSeconds: number;
-  onSkip: () => void;
-  onAddSeconds: (seconds: number) => void;
-  bottomInset: number;
-}) {
-  const isDone = secondsLeft <= 0;
-  const minutes = Math.floor(secondsLeft / 60);
-  const seconds = secondsLeft % 60;
-  const progress = totalSeconds > 0 ? Math.min(1, Math.max(0, secondsLeft / totalSeconds)) : 0;
-
-  return (
-    <View style={[restTimerStyles.container, { bottom: Math.max(16, bottomInset) }]}>
-      <View style={restTimerStyles.progressTrack}>
-        <View style={[restTimerStyles.progressFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <View style={restTimerStyles.row}>
-        <View style={restTimerStyles.timeBlock}>
-          <Ionicons
-            name={isDone ? 'checkmark-circle' : 'time'}
-            size={20}
-            color={isDone ? COLORS.success : COLORS.primary}
-          />
-          <Text style={[restTimerStyles.timeText, isDone && { color: COLORS.success }]}>
-            {isDone ? 'Repos terminé' : `REPOS  ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`}
-          </Text>
-        </View>
-
-        <View style={restTimerStyles.presetsRow}>
-          {!isDone && (
-            <TouchableOpacity style={restTimerStyles.addBtn} onPress={() => onAddSeconds(30)}>
-              <Text style={restTimerStyles.addBtnText}>+30 sec</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={restTimerStyles.skipBtn} onPress={onSkip}>
-            <Text style={restTimerStyles.presetText}>Passer</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ============================================================
-// EmptySession
-// ============================================================
 
 function EmptySession() {
   return (
@@ -1017,76 +885,6 @@ const prStyles = StyleSheet.create({
   emoji: { fontSize: 26 },
   title: { fontSize: FONTS.md, fontWeight: FONTS.bold, color: '#fff' },
   subtitle: { fontSize: FONTS.sm, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
-});
-
-const restTimerStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: SPACING.base,
-    right: SPACING.base,
-    bottom: SPACING.base,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    overflow: 'hidden',
-    ...SHADOWS.card,
-  },
-  progressTrack: {
-    height: 4,
-    backgroundColor: COLORS.cardBorder,
-    width: '100%',
-  },
-  progressFill: {
-    height: 4,
-    backgroundColor: COLORS.primary,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  timeBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  timeText: {
-    fontSize: FONTS.md,
-    fontWeight: FONTS.bold,
-    color: COLORS.textPrimary,
-    fontVariant: ['tabular-nums'],
-  },
-  presetsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    flex: 1,
-  },
-  presetChip: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  presetText: { fontSize: FONTS.xs, color: COLORS.textSecondary, fontWeight: FONTS.medium },
-  addBtn: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.primaryGlow,
-  },
-  addBtnText: { fontSize: FONTS.xs, color: COLORS.primary, fontWeight: FONTS.semibold },
-  skipBtn: { padding: 8, minHeight: 44, justifyContent: 'center' },
 });
 
 const emptyStyles = StyleSheet.create({

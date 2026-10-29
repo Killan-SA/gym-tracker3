@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { notifyDataChanged } from './dataEvents';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { getDb, generateId } from './database';
@@ -277,5 +278,6 @@ export function importPreviews(
     onProgress?.(i + 1, previews.length);
   }
 
+  notifyDataChanged();
   return { imported, duplicates };
 }

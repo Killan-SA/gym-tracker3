@@ -15,6 +15,9 @@ import { GoalSelector } from '../../components/GoalSelector';
 import { KeyboardDoneAccessory } from '../../components/KeyboardDoneAccessory';
 import { COLORS } from '../../constants/theme';
 import { Tutorial } from '../../components/Tutorial';
+import { TrainingPreferences } from '../../components/TrainingPreferences';
+import { BackupActions, clearPrivateBackupFiles } from '../../components/BackupActions';
+import { SettingsMenuRow as MenuRow } from '../../components/SettingsMenuRow';
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
@@ -46,7 +49,7 @@ export default function SettingsScreen() {
     Alert.alert('Effacer toutes mes données ?', 'Ton prénom, ton poids, tes objectifs, tes séances, tes favoris, tes exercices personnalisés et tes réglages seront effacés. La configuration de départ s’ouvrira à nouveau. Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Tout effacer', style: 'destructive', onPress: () => {
-        try { resetAppData(); router.replace('/(tabs)'); }
+        try { clearPrivateBackupFiles(); resetAppData(); router.replace('/(tabs)'); }
         catch { Alert.alert('Réinitialisation', 'Impossible de réinitialiser les données. Réessaie.'); }
       } },
     ]);
@@ -75,6 +78,8 @@ export default function SettingsScreen() {
       <Section title="Mes priorités" />
       <Panel><Text style={s.muted}>Ce que j’ai envie de travailler en priorité.</Text><GoalSelector value={profile.goals} onChange={goals => profile.saveProfile(profile.name, goals)} /><View style={s.divider} /><Text style={s.eyebrow}>MON PROGRAMME</Text><Text style={s.programName}>{program?.name ?? 'Entraînement libre'}</Text><Action title="Voir les programmes" secondary onPress={() => router.push('/programs')} /></Panel>
 
+      <Section title="Mon entraînement" />
+      <Panel><TrainingPreferences key={profile.setupRevision} /></Panel>
       <Section title="Ma bibliothèque" />
       <Panel><MenuRow icon="add-circle-outline" title="Ajouter un exercice" description="Ma machine, ma variante, mon exercice" onPress={() => router.push('/exercises/new')} /></Panel>
 
@@ -82,7 +87,7 @@ export default function SettingsScreen() {
       <Panel><Text style={s.label}>Couleur principale</Text><View style={s.themes}>{Object.values(THEMES).map(option => <TouchableOpacity key={option.id} accessibilityLabel={`Thème ${option.label}`} accessibilityRole="radio" accessibilityState={{ checked: settings.themeId === option.id }} onPress={() => settings.setThemeId(option.id)} style={[s.swatch, { backgroundColor: option.swatch }, settings.themeId === option.id && { borderColor: COLORS.textPrimary }]}>{settings.themeId === option.id && <Ionicons name="checkmark" size={22} color="#fff" />}</TouchableOpacity>)}</View><Text style={s.hint}>{theme.label}</Text></Panel>
 
       <Section title="Mes données" />
-      <Panel><MenuRow icon="document-text-outline" title="Importer mon historique Excel" description="Fichiers .xlsx et .xls" onPress={() => router.push('/import')} /><View style={s.divider} /><MenuRow icon="trash-outline" title="Effacer toutes mes données" description="Repartir de zéro et refaire la configuration" danger onPress={reset} /></Panel>
+      <Panel><View><BackupActions key={profile.setupRevision} onRestored={() => setCounts({ sessions: getAllSessions().length, exercises: getCustomExercises().length })} /><View style={s.divider} /><MenuRow icon="document-text-outline" title="Importer mon historique Excel" description="Fichiers .xlsx et .xls" onPress={() => router.push('/import')} /><View style={s.divider} /><MenuRow icon="trash-outline" title="Effacer toutes mes données" description="Repartir de zéro et refaire la configuration" danger onPress={reset} /></View></Panel>
       <Section title="Un coup de main ?" /><Panel><MenuRow icon="sparkles-outline" title="Revoir le mini tutoriel" description="Séances, séries, repos et bilan musculaire" onPress={() => setShowGuide(true)} /></Panel>
       <View style={s.footer}><Ionicons name="lock-closed-outline" size={16} color={COLORS.textMuted} /><Text style={s.hint}>Tes données restent sur cet iPhone.</Text></View>
     </ScrollView>
@@ -91,11 +96,6 @@ export default function SettingsScreen() {
   </KeyboardAvoidingView>;
 }
 
-function MenuRow({ icon, title, description, onPress, danger = false }: { icon: React.ComponentProps<typeof Ionicons>['name']; title: string; description: string; onPress: () => void; danger?: boolean }) {
-  const theme = useAppTheme();
-  const color = danger ? COLORS.danger : theme.primary;
-  return <TouchableOpacity accessibilityRole="button" onPress={onPress} style={s.menuRow}><View style={[s.menuIcon, { backgroundColor: danger ? COLORS.dangerGlow : theme.primaryGlow }]}><Ionicons name={icon} size={23} color={color} /></View><View style={{ flex: 1, gap: 5 }}><Text style={[s.label, danger && { color }]}>{title}</Text><Text style={s.hint}>{description}</Text></View><Ionicons name="chevron-forward" size={17} color={COLORS.textMuted} /></TouchableOpacity>;
-}
 const s = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 }, hero: { flexDirection: 'row', alignItems: 'center', gap: 18, marginBottom: 24, marginTop: 8 }, avatar: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }, initial: { fontSize: 34, fontWeight: '800' }, heroTitle: { color: COLORS.textPrimary, fontSize: 29, fontWeight: '800' }, muted: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, justifyContent: 'space-between' }, eyebrow: { color: COLORS.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1.4 }, input: { flex: 1, minHeight: 50, color: COLORS.textPrimary, fontSize: 19, fontWeight: '600', paddingHorizontal: 0 }, weightInput: { fontSize: 30, fontWeight: '800' }, saveButton: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

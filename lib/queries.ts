@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { notifyDataChanged } from './dataEvents';
 import { getDb, generateId, nowISO, getUserSetting, setUserSetting, resetAllData as resetDatabase } from './database';
 import { PREDEFINED_EXERCISES, EXERCISE_CATEGORIES } from '../constants/exercises';
 import type { ExerciseEntry } from '../constants/exercises';
@@ -56,6 +57,7 @@ export function createSession(notes?: string): Session {
 export function deleteSession(sessionId: string): void {
   const db = getDb();
   db.runSync('DELETE FROM sessions WHERE id = ?', [sessionId]);
+  notifyDataChanged();
 }
 
 /** Retourne une séance avec tous ses exercices et séries */
@@ -135,6 +137,7 @@ export function addExerciseToSession(
 export function deleteExercise(exerciseId: string): void {
   const db = getDb();
   db.runSync('DELETE FROM exercises WHERE id = ?', [exerciseId]);
+  notifyDataChanged();
 }
 
 /** Retourne tous les noms d'exercices connus (pour l'autocomplete) */
@@ -193,6 +196,7 @@ export function addSet(
     [set.id, set.exercise_id, set.set_number, set.weight, set.reps, set.rpe, set.notes]
   );
 
+  notifyDataChanged();
   return set;
 }
 
@@ -208,12 +212,14 @@ export function updateSet(
     'UPDATE sets SET weight = ?, reps = ?, rpe = ? WHERE id = ?',
     [weight, reps, rpe ?? null, setId]
   );
+  notifyDataChanged();
 }
 
 /** Supprime une série */
 export function deleteSet(setId: string): void {
   const db = getDb();
   db.runSync('DELETE FROM sets WHERE id = ?', [setId]);
+  notifyDataChanged();
 }
 
 /** Retourne la dernière série d'un exercice (pour le pré-remplissage) */

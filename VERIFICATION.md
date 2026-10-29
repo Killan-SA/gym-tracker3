@@ -1,4 +1,18 @@
-# Vérification du projet après intégration du logo
+# Vérification du projet
+
+## Fonctions pour les séances en salle
+
+Notes persistantes, déplacement des exercices, alternatives locales préservant les séries, régularité hebdomadaire, repos plein écran, sauvegarde/restauration JSON, export Excel et widget iPhone : détails et parcours de validation dans [AMELIORATIONS_SEANCE.md](./AMELIORATIONS_SEANCE.md).
+
+Les contrôles finaux réussissent : 47 tests de régression, 6 tests du sélecteur, TypeScript, Expo Doctor 20/20 et export iOS. Le rollback de restauration est vérifié par une panne SQLite simulée après suppression et début de réinsertion. Le banc de tests refuse aussi les transactions Expo imbriquées. L’introspection Expo confirme l’extension du widget et les entitlements du groupe partagé. React Native est aligné sur le correctif 0.88.1 attendu par Expo. Les interactions natives et le widget restent à confirmer sur iPhone ; la Live Activity attend cette validation du timer.
+
+## Correction de l’import TestFlight
+
+Erreur signalée sur iPhone : `Different document picking in progress` à l’appel de `getDocumentAsync`. Le bouton restait actif pendant l’ouverture du sélecteur natif, permettant des appels concurrents. L’écran d’import était également présenté en fenêtre modale.
+
+Un verrou synchrone local et un verrou partagé entre écrans empêchent les ouvertures simultanées. Le bouton attend la transition de navigation et reste désactivé pendant la sélection et la lecture. L’import utilise maintenant une présentation normale. Annuler ou recevoir une erreur libère le verrou ; une sélection native toujours en attente conserve son verrou. Les erreurs de sélection sont distinguées des erreurs de lecture, avec une indication de récupération si iOS reste bloqué. Aucun changement de base de données ni effacement de données.
+
+TypeScript, les 25 tests SQLite et l’export iOS (1 541 modules, 78 assets) ont été relancés avec succès. Six tests supplémentaires du sélecteur réussissent : double appui, annulation, rejet natif, exception synchrone, sélection partagée entre écrans et reconnaissance de l’erreur rapportée. La validation du sélecteur UIKit sur un iPhone nécessite un nouveau build TestFlight ; les tests JavaScript ne reproduisent pas sa présentation native.
 
 ## Logo
 
@@ -17,7 +31,7 @@ La génération des tailles natives est effectuée par Expo pendant la compilati
 ## Contrôles effectués
 
 - TypeScript : réussi.
-- Régression SQLite en mémoire : 25 tests réussis, dont migration des anciennes données, import Excel avec la nouvelle bibliothèque, programmes, tutoriel, reset et pyramides.
+- Régression SQLite et logique : 47 tests réussis, dont anciennes migrations, import Excel, programmes, tutoriel, notes, réorganisation, remplacement, régularité, repos, sauvegardes et rollback. Six tests supplémentaires vérifient le sélecteur de fichiers.
 - Expo Doctor : 20/20 contrôles réussis.
 - Introspection des plugins natifs Expo : réussie, configuration iOS générée sans erreur.
 - Export du bundle iOS : réussi avec les 78 assets attendus, dont le nouveau logo et les 35 images d’exercices ; cet export est distinct d’une compilation native signée.

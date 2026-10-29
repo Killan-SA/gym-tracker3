@@ -31,6 +31,23 @@
           "resizeMode": "contain",
           "backgroundColor": "#080B0D"
         }
+      ],
+      "expo-sharing",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.killan.gymtracker.widgets",
+          "groupIdentifier": "group.com.killan.gymtracker",
+          "enableAndroid": false,
+          "widgets": [
+            {
+              "name": "GymTrackerWidget",
+              "displayName": "GymTracker",
+              "description": "Prochaine séance et objectif hebdomadaire",
+              "ios": { "supportedFamilies": ["systemSmall", "systemMedium"] }
+            }
+          ]
+        }
       ]
     ],
     "experiments": {

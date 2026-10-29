@@ -6,54 +6,102 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
-import { useState } from 'react';
-import { router } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
+import type { NativeStackNavigationProp } from 'expo-router/native-stack';
+import type { ParamListBase } from 'expo-router/react-navigation';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import { parseXlsxFile, importPreviews } from '../lib/importXlsx';
 import type { ImportSessionPreview, ImportResult } from '../lib/importXlsx';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { getImportFileError, selectImportDocument } from '../lib/importDocumentPicker';
 
-type Step = 'idle' | 'parsing' | 'preview' | 'importing' | 'done';
+type Step = 'idle' | 'picking' | 'parsing' | 'preview' | 'importing' | 'done';
 
 export default function ImportScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
   const [step, setStep] = useState<Step>('idle');
   const [result, setResult] = useState<ImportResult | null>(null);
   const [importStats, setImportStats] = useState<{ imported: number; duplicates: number } | null>(null);
+  const [pickerReady, setPickerReady] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [pickerSlow, setPickerSlow] = useState(false);
+  const pickInProgress = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    setPickerSlow(false);
+    if (step !== 'picking') return;
+    const timer = setTimeout(() => setPickerSlow(true), 12000);
+    return () => clearTimeout(timer);
+  }, [step]);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    // Initial/deep-link entries can have no transitionEnd event. The fallback
+    // only enables the button; it never opens the system picker automatically.
+    let fallback: ReturnType<typeof setTimeout>;
+    const waitForTransition = () => {
+      setPickerReady(false);
+      clearTimeout(fallback);
+      fallback = setTimeout(() => { if (active) setPickerReady(true); }, 600);
+    };
+    const unsubscribeStart = navigation.addListener('transitionStart', waitForTransition);
+    const unsubscribeEnd = navigation.addListener('transitionEnd', event => {
+      if (active && !event.data.closing) { clearTimeout(fallback); setPickerReady(true); }
+    });
+    waitForTransition();
+    return () => { active = false; clearTimeout(fallback); unsubscribeStart(); unsubscribeEnd(); setPickerReady(false); };
+  }, [navigation]));
 
   // ── Sélection du fichier ──────────────────────────────────────
   const handlePickFile = async () => {
+    // React state alone is too late to block two taps within the same frame.
+    if (pickInProgress.current || !pickerReady) return;
+    pickInProgress.current = true;
+    Keyboard.dismiss();
+    setFileError(null);
+    setStep('picking');
+    let phase: 'picking' | 'reading' = 'picking';
     try {
-      const picked = await DocumentPicker.getDocumentAsync({
-        type: [
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.ms-excel',
-          '*/*',
-        ],
-        copyToCacheDirectory: true,
-      });
-
-      if (picked.canceled || !picked.assets?.[0]) return;
+      const selection = await selectImportDocument(DocumentPicker.getDocumentAsync);
+      if (!mounted.current) return;
+      if (selection.status === 'busy') {
+        setStep('idle');
+        setFileError('Une sélection de fichier est déjà ouverte. Termine-la ou annule-la avant de réessayer.');
+        return;
+      }
+      const picked = selection.result;
+      if (picked.canceled || !picked.assets?.[0]) { setStep('idle'); return; }
 
       const asset = picked.assets[0];
-      if (!asset.name.toLowerCase().endsWith('.xlsx') && !asset.name.toLowerCase().endsWith('.xls')) {
+      if (!asset.name.trim().toLowerCase().endsWith('.xlsx') && !asset.name.trim().toLowerCase().endsWith('.xls')) {
+        setStep('idle');
         Alert.alert('Fichier invalide', 'Sélectionne un fichier Excel (.xlsx ou .xls).');
         return;
       }
 
       setStep('parsing');
+      phase = 'reading';
       setResult(null);
       setImportStats(null);
 
       const buffer = await new File(asset.uri).arrayBuffer();
+      if (!mounted.current) return;
       const parsed = parseXlsxFile(buffer);
       setResult(parsed);
       setStep('preview');
     } catch (err) {
+      if (!mounted.current) return;
       setStep('idle');
-      Alert.alert('Erreur', `Impossible de lire le fichier : ${String(err)}`);
+      const message = getImportFileError(err, phase);
+      setFileError(message);
+      Alert.alert(phase === 'picking' ? 'Sélection du fichier' : 'Lecture du fichier', message);
+    } finally {
+      pickInProgress.current = false;
     }
   };
 
@@ -87,6 +135,8 @@ export default function ImportScreen() {
   };
 
   const handleReset = () => {
+    if (pickInProgress.current) return;
+    setFileError(null);
     setStep('idle');
     setResult(null);
     setImportStats(null);
@@ -113,17 +163,20 @@ export default function ImportScreen() {
       </View>
 
       {/* ── Étape IDLE / sélection ── */}
-      {(step === 'idle' || step === 'parsing') && (
+      {fileError && <View accessibilityRole="alert" style={styles.errorBox}><Text style={styles.errorText}>{fileError}</Text></View>}
+      {pickerSlow && <View style={styles.errorBox}><Text style={styles.errorText}>Si Fichiers ne s’affiche pas, ferme complètement GymTracker depuis le sélecteur d’apps de l’iPhone puis rouvre-la. Ne désinstalle pas l’app et n’efface pas tes données.</Text></View>}
+      {(step === 'idle' || step === 'picking' || step === 'parsing') && (
         <TouchableOpacity
-          style={[styles.pickButton, step === 'parsing' && { opacity: 0.6 }]}
+          style={[styles.pickButton, (step !== 'idle' || !pickerReady) && { opacity: 0.6 }]}
           onPress={handlePickFile}
-          disabled={step === 'parsing'}
+          disabled={step !== 'idle' || !pickerReady}
+          accessibilityState={{ disabled: step !== 'idle' || !pickerReady, busy: step === 'picking' || step === 'parsing' }}
           activeOpacity={0.8}
         >
-          {step === 'parsing' ? (
+          {step === 'parsing' || step === 'picking' ? (
             <>
               <ActivityIndicator color="#fff" />
-              <Text style={styles.pickButtonText}>Analyse en cours…</Text>
+              <Text style={styles.pickButtonText}>{step === 'picking' ? 'Sélection du fichier en cours…' : 'Analyse en cours…'}</Text>
             </>
           ) : (
             <>

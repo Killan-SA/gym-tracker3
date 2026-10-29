@@ -5,6 +5,10 @@
 export interface ExerciseEntry {
   name: string;
   category: string;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
+  equipment?: string;
+  movementPattern?: string;
 }
 
 export const EXERCISE_CATEGORIES = [

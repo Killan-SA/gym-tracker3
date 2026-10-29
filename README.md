@@ -1,5 +1,9 @@
 # GymTracker — Refonte
 
+Le [rapport complet des fonctionnalités et les commandes TestFlight](./RAPPORT_COMPLET_GYMTRACKER.md) récapitulent l’ensemble de l’application.
+
+Les nouvelles fonctions pour les séances en salle et leurs essais sur iPhone sont décrits dans [AMELIORATIONS_SEANCE.md](./AMELIORATIONS_SEANCE.md) : notes, déplacement, remplacement, régularité hebdomadaire, repos plein écran, sauvegardes et widget.
+
 Application Expo / React Native reprise du dossier original `C:\Users\killa\.gemini\antigravity\scratch\gymtracker2`. Le dossier original et le prototype voisin `GymtrackerRefonteV2` sont conservés séparément.
 
 Le logo K néon fourni est intégré dans l’interface, l’icône et le splash iOS. Le détail des contrôles, corrections et alertes de dépendances restantes se trouve dans [VERIFICATION.md](./VERIFICATION.md). L’icône native sera mise à jour au prochain build iOS.
@@ -24,7 +28,7 @@ Le clavier numérique iOS dispose d’un bouton **Terminé** dans le profil, le 
 
 - Accueil : prochaine séance du programme, démarrage direct, séance libre, volume sur 7 jours, records, historique récent et suggestion issue de l’historique.
 - Séance : cartes illustrées, dernière performance hors séance courante, objectif indicatif de double progression, poids/répétitions/RPE, validation avec vibration, appui long sur la validation pour supprimer une série. Les saisies restent enregistrées à la sortie du champ, comme dans l’original ; la coche sert à suivre visuellement les séries réalisées.
-- Repos : déclenchement manuel, durée initiale 90 s, choix 60/90/120/180 s, barre flottante, +30 s et Passer. L’ajout et la validation d’une série ne déclenchent pas le repos. Le décompte utilise une échéance réelle et se recale au retour de l’app. La vibration nécessite que JavaScript puisse s’exécuter ; aucune notification en arrière-plan n’a été ajoutée.
+- Repos : écran plein écran, durée initiale 90 s, choix 60/90/120/180 s, −15 s, +30 s et Passer. Déclenchement manuel ou automatique après validation selon le réglage du profil. Échéance réelle persistée et recalcul au retour de l’app. Vibration dans l’app active ou au retour ; aucune notification de fin en arrière-plan.
 - Exercices : bibliothèque complète dès la première ouverture, recherche sans accents, catégories, favoris SQLite et bouton Ajouter un exercice. Le formulaire permet de choisir le nom et le groupe musculaire, vérifie les doublons sans tenir compte des accents/casse et enregistre l’exercice pour les prochaines séances.
 - Fiche exercice : illustration, muscles, favoris, records et graphiques existants, périodes et métriques, consignes et erreurs fréquentes pour les exercices prédéfinis.
 - Historique : liste et calendrier conservés, noms des nouvelles séances de programme, nombre de séries, volume, durée des nouvelles séances terminées, détail avec RPE.
@@ -51,7 +55,7 @@ Après la configuration, le premier lancement propose un guide facultatif en qua
 
 ## Données et compatibilité
 
-La logique des séances, statistiques et import reste issue de l’original. La base s’appelle toujours `gymtracker.db` et les migrations sont inchangées. Les nouvelles préférences (prénom, objectifs, favoris, titres, durées, coches et état du premier démarrage) sont ajoutées dans la table `user_settings` existante. Le catalogue de programmes est enrichi. Aucun serveur, compte, tracker ou chargement d’image distante n’est ajouté.
+La logique des séances, statistiques et import reste issue de l’original. La base s’appelle toujours `gymtracker.db` ; les anciennes migrations sont conservées et la migration 4 ajoute les notes machine. Les nouvelles préférences (prénom, objectifs, favoris, titres, durées, coches et état du premier démarrage) sont ajoutées dans la table `user_settings` existante. Le catalogue de programmes est enrichi. Aucun serveur, compte, tracker ou chargement d’image distante n’est ajouté.
 
 **Profil → Effacer toutes mes données** supprime en une transaction les séances, exercices, séries, exercices personnalisés, préférences, profil, poids, objectifs et favoris. Les stores en mémoire sont remis aux valeurs initiales et la configuration s’ouvre immédiatement, sans redémarrer l’app. Cette action reste protégée par une confirmation et n’est jamais exécutée automatiquement. Les tests de suppression utilisent exclusivement SQLite en mémoire.
 
@@ -65,7 +69,9 @@ Les images raster originales sont embarquées dans `assets/exercises/*.png`, ass
 
 ## Import Excel
 
-Disponible dans **Historique → Importer mon historique Excel**, **Profil → Données** et pendant le premier démarrage. Sur iPhone, le fichier peut être choisi dans Fichiers, y compris iCloud lorsqu’il est disponible. L’app copie le fichier dans son cache et le lit localement avec l’API `File` du SDK Expo 58.
+Disponible dans **Profil → Mes données → Importer mon historique Excel** et pendant le premier démarrage. Le raccourci de l’onglet Historique a été retiré pour éviter le doublon. Sur iPhone, le fichier peut être choisi dans Fichiers, y compris iCloud lorsqu’il est disponible. L’app copie le fichier dans son cache et le lit localement avec l’API `File` du SDK Expo 58.
+
+Le bouton attend la fin de la transition de navigation et reste désactivé pendant la sélection et la lecture. Un verrou partagé empêche deux ouvertures simultanées du sélecteur iOS, même après un changement d’écran. L’écran d’import utilise une présentation normale pour éviter de superposer le sélecteur système à une fenêtre modale. Les erreurs de sélection et de lecture sont distinguées. Si une ancienne version affiche « Different document picking in progress », fermer complètement l’app puis la rouvrir, sans la désinstaller ni effacer ses données. Cette correction nécessite un nouveau build TestFlight.
 
 Formats : `.xlsx` et `.xls`. Colonnes : Date, Machine, Série (facultative), Poids (kg), Rep. Une prévisualisation précède l’enregistrement ; les dates déjà présentes sont signalées comme doublons. Exemple prêt à remplir : `examples/historique-exemple.xlsx`. Le script `node scripts/create-excel-example.cjs` le régénère.
 
@@ -89,9 +95,12 @@ Une compilation iOS signée et l’envoi TestFlight/App Store nécessitent les a
 ```powershell
 npm run typecheck
 npm run test:regression
+npm run test:import-picker
 npm run check:ios
 ```
 
-Les 25 tests de régression utilisent SQLite en mémoire avec Node 22 : conservation d’une base ancienne, migration RPE, CRUD, historique, exclusion de la séance courante, favoris, durée, programme, préférences existantes, conversions, statistiques, import XLSX, images embarquées, premier démarrage, poids, prénom et objectifs, classement des programmes, création d’exercices, réinitialisation complète, conversion en tonnes, carte musculaire et périodes, équivalences d’objets, tutoriel, pyramides PDC et exclusion des séries non réalisées des records et courbes. L’export vérifie le bundling iOS ; il ne produit pas un fichier IPA.
+Les 47 tests de régression utilisent SQLite en mémoire avec Node 22 : anciennes données et migrations, CRUD, historique, favoris, programmes, conversions, statistiques, import XLSX, onboarding, tutoriel, pyramides, notes machine, ordre des exercices, remplacement sans perte de séries, régularité hebdomadaire, repos, sauvegarde, restauration et rollback. Six tests supplémentaires vérifient le sélecteur de fichiers. L’export vérifie le bundling iOS ; il ne produit pas un fichier IPA.
 
 À valider sur iPhone : bouton Terminé et clavier kg/reps/RPE, premier démarrage vierge et reprise après fermeture, vibration, repos après verrouillage, cadrage des images, appui long de suppression, import depuis Fichiers et mise à jour sur une installation contenant déjà des données. Aucun simulateur iOS ou iPhone n’était connecté pendant cette réalisation.
+
+Les 6 tests du sélecteur vérifient les doubles appuis, l’annulation, les erreurs natives et synchrones, le verrou partagé entre écrans et le message de récupération. Sur TestFlight, vérifier aussi la sélection depuis iCloud et Sur mon iPhone, l’annulation suivie d’une nouvelle sélection, et l’ouverture depuis le premier démarrage.

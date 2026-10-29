@@ -7,10 +7,13 @@ import { getDb } from '../lib/database';
 import { useSettingsStore } from '../lib/settingsStore';
 import { COLORS } from '../constants/theme';
 import { Onboarding } from '../components/Onboarding';
-import { beginOnboarding, needsOnboarding } from '../lib/onboarding';
+import { beginOnboarding, needsOnboarding, getInitialDataImportRoute, type InitialDataSource } from '../lib/onboarding';
 import { useProfileStore } from '../store/profile';
 import { Tutorial } from '../components/Tutorial';
 import { finishTutorial, needsTutorial } from '../lib/tutorial';
+import { useRestTimerStore } from '../store/restTimerStore';
+import { startWidgetSync } from '../lib/widgetSync';
+import { RestTimerObserver } from '../components/RestTimerObserver';
 
 // Empêche le splash screen de se fermer automatiquement
 SplashScreen.preventAutoHideAsync();
@@ -18,8 +21,9 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
-  const pendingImport = useRef(false);
+  const pendingImport = useRef<InitialDataSource>('none');
   const setupRevision = useProfileStore(state => state.setupRevision);
+  useEffect(() => startWidgetSync(), []);
   useEffect(() => {
     // Initialise la base de données au démarrage
     try {
@@ -27,6 +31,7 @@ export default function RootLayout() {
       // Charge les préférences persistées (unité kg/lbs, thème, programme, etc.)
       useSettingsStore.getState().loadSettings();
       useProfileStore.getState().loadProfile();
+      useRestTimerStore.getState().hydrate();
       if (needsOnboarding()) { setShowTutorial(false); beginOnboarding(); setShowWelcome(true); }
       else if (needsTutorial()) setShowTutorial(true);
     } catch (error) {
@@ -38,15 +43,20 @@ export default function RootLayout() {
   }, [setupRevision]);
 
   const openPendingImport = () => {
-    if (pendingImport.current) { pendingImport.current = false; router.push('/import'); }
+    const route = getInitialDataImportRoute(pendingImport.current);
+    pendingImport.current = 'none';
+    if (route) router.push(route);
   };
   const afterWelcome = () => { if (needsTutorial()) setShowTutorial(true); else openPendingImport(); };
 
   return (
     <>
       <StatusBar style="light" />
+      <RestTimerObserver />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="rest" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+        <Stack.Screen name="restore" options={{ presentation: 'card', headerShown: true, headerTitle: 'Restaurer une sauvegarde', headerStyle: { backgroundColor: COLORS.background }, headerTintColor: COLORS.textPrimary, headerBackTitle: ' ' }} />
         <Stack.Screen name="exercises/new" options={{ headerShown: true, title: 'Ajouter un exercice', headerStyle: { backgroundColor: COLORS.background }, headerTintColor: COLORS.textPrimary, headerBackTitle: ' ' }} />
         <Stack.Screen name="report" options={{ headerShown: true, title: "Bilan détaillé", headerStyle: { backgroundColor: COLORS.surface }, headerTintColor: COLORS.textPrimary }} />
         <Stack.Screen
@@ -57,7 +67,8 @@ export default function RootLayout() {
             headerTintColor: COLORS.textPrimary,
             headerTitle: 'Séance en cours',
             headerBackTitle: ' ',
-            presentation: 'modal',
+            presentation: 'card',
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -88,7 +99,7 @@ export default function RootLayout() {
             headerTintColor: COLORS.textPrimary,
             headerTitle: 'Importer un historique',
             headerBackTitle: ' ',
-            presentation: 'modal',
+            presentation: 'card',
           }}
         />
         <Stack.Screen
@@ -102,8 +113,8 @@ export default function RootLayout() {
           }}
         />
       </Stack>
-      <Onboarding key={setupRevision} visible={showWelcome} onComplete={(importExcel) => {
-        pendingImport.current = importExcel;
+      <Onboarding key={setupRevision} visible={showWelcome} onComplete={(source) => {
+        pendingImport.current = source;
         setShowWelcome(false);
         if (Platform.OS !== 'ios') afterWelcome();
       }} onDismiss={() => {

@@ -74,11 +74,6 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/import')} style={{ margin: 16, padding: 16, borderRadius: 16, backgroundColor: COLORS.primaryGlow, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Ionicons name="document-text-outline" size={22} color={COLORS.primary} />
-        <Text style={{ color: COLORS.primary, fontSize: 14, fontWeight: '700', flex: 1 }}>Importer mon historique Excel</Text>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
-      </TouchableOpacity>
       {!isEmpty && (
         <ViewToggle mode={viewMode} onChange={setViewMode} />
       )}
