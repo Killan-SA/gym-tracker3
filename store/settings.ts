@@ -61,7 +61,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const storedTheme = getUserSetting(THEME_KEY);
 
     // Programme actif (user_settings avec fallback app_settings)
-    const storedProgramId = getUserSetting(PROGRAM_KEY) || getAppSetting('active_program_id');
+    const userProgramId = getUserSetting(PROGRAM_KEY);
+    const storedProgramId = userProgramId !== null ? userProgramId : getAppSetting('active_program_id');
     const storedDayIndex = getUserSetting(PROGRAM_DAY_KEY) || getAppSetting('program_next_day_index');
 
     set({

@@ -22,6 +22,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ExerciseTools } from '../../components/ExerciseTools';
 import { reorderExercises } from '../../lib/sessionFeatures';
 import { useRestTimerStore } from '../../store/restTimerStore';
+import { secondsRemaining } from '../../lib/restTimer';
+import { requestLocalNotificationPermission } from '../../lib/localNotifications';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardDoneAccessory } from '../../components/KeyboardDoneAccessory';
 import { PyramidControls } from '../../components/PyramidControls';
@@ -52,6 +54,7 @@ import { useSettingsStore } from '../../lib/settingsStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExerciseVisual } from '../../components/ExerciseVisual';
 import { getPreviousPerformance, getSessionTitle, finishSession } from '../../lib/redesign';
+import { getClassicSetSuggestion } from '../../lib/progression';
 import { getUserSetting, setUserSetting } from '../../lib/database';
 import { formatWeight, fromKg, toKg, roundWeight, unitLabel } from '../../lib/units';
 import { getExerciseCategory } from '../../constants/exercises';
@@ -79,11 +82,13 @@ export default function SessionScreen() {
   const [elapsed, setElapsed] = useState(0);
   const insets = useSafeAreaInsets();
   const stopRestTimer = useRestTimerStore(state => state.stop);
-  const openRest = (exercise?: ExerciseWithSets, set?: Set) => {
+  const openRest = async (exercise?: ExerciseWithSets, set?: Set) => {
     if (openingRest.current || !id) return;
     openingRest.current = true;
     const targetExercise = exercise ?? lastValidated?.exercise;
     const targetSet = set ?? lastValidated?.set;
+    await requestLocalNotificationPermission().catch(() => false);
+    Keyboard.dismiss();
     useRestTimerStore.getState().start({ duration: restDuration, sessionId: id, exerciseId: targetExercise?.id ?? '', exerciseName: targetExercise?.name ?? 'Séance', setNumber: targetSet?.set_number ?? 0, weight: targetSet?.weight ?? 0, reps: targetSet?.reps ?? 0 });
     router.push('/rest');
     setTimeout(() => { openingRest.current = false; }, 800);
@@ -235,7 +240,7 @@ export default function SessionScreen() {
         onDragBegin={() => { Keyboard.dismiss(); Vibration.vibrate(30); }}
         onDragEnd={({ data }) => { try { reorderExercises(id!, data.map(row => row.id)); setExercises(data); } catch (error) { Alert.alert('Ordre des exercices', String(error)); loadSession(); } }}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: 50 + insets.bottom }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 35 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
@@ -274,6 +279,13 @@ export default function SessionScreen() {
           </View>
         }
       />
+
+      {(lastValidated || rest?.sessionId === id) && <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: Math.max(12, insets.bottom), borderTopWidth: 1, borderColor: COLORS.cardBorder, backgroundColor: COLORS.background, gap: 8 }}>
+        <Text numberOfLines={1} style={{ color: COLORS.textSecondary, fontSize: 12 }}>{lastValidated ? `${lastValidated.exercise.name} · Série ${lastValidated.set.set_number} validée ✓` : rest?.exerciseName}</Text>
+        <TouchableOpacity accessibilityRole="button" style={{ minHeight: 52, borderRadius: 16, backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }} onPress={() => {
+          if (rest?.sessionId === id && secondsRemaining(rest) > 0) router.push('/rest'); else openRest();
+        }}><Ionicons name="timer-outline" size={22} color={COLORS.background} /><Text style={{ color: COLORS.background, fontSize: 16, fontWeight: '800' }}>{rest?.sessionId === id && secondsRemaining(rest) > 0 ? `Reprendre le chrono · ${Math.floor(secondsRemaining(rest) / 60)}:${(secondsRemaining(rest) % 60).toString().padStart(2, '0')}` : `Démarrer le repos · ${restDuration} s`}</Text></TouchableOpacity>
+      </View>}
 
       {/* ── Modal sélecteur d'exercice ─────────────────────── */}
       <Modal
@@ -470,8 +482,11 @@ function ExerciseCard({
   const recordSoFar = getExercisePersonalRecord(exercise.name);
   const useKg = useSettingsStore(state => state.useKg);
   const previous = useMemo(() => getPreviousPerformance(exercise.name, exercise.session_id), [exercise.name, exercise.session_id]);
-  const increaseWeight = previous && previous.reps >= 12 && previous.weight > 0 && !BODYWEIGHT_EXERCISES.includes(exercise.name);
-  const target = previous ? { weight: increaseWeight ? previous.weight + 2.5 : previous.weight, reps: increaseWeight ? 8 : previous.reps + 1 } : null;
+  const reference = getClassicSetSuggestion(previous, exercise.name, 0);
+  const progressionTarget = getClassicSetSuggestion(previous, exercise.name, 1);
+  const firstSet = exercise.sets[0];
+  const referenceValidated = !!firstSet && firstSet.reps > 0 && getUserSetting('set_confirmed:' + firstSet.id) === '1';
+  const displayedTarget = referenceValidated ? progressionTarget : reference;
   const isBodyweight = BODYWEIGHT_EXERCISES.includes(exercise.name);
   const pyramidEnabled = isBodyweight && (getPyramidPlan(exercise.id)?.enabled ?? false);
 
@@ -486,7 +501,7 @@ function ExerciseCard({
       <Text style={cardStyles.category}>{getExerciseCategory(exercise.name)}</Text>
       <ExerciseTools exercise={exercise} onReload={onReload} onDelete={onDeleteExercise} />
       <ExerciseVisual name={exercise.name} large />
-      <View style={cardStyles.performance}><View style={{ flex: 1 }}><Text style={cardStyles.performanceLabel}>DERNIÈRE FOIS</Text><Text style={cardStyles.performanceValue}>{previous ? formatWeight(previous.weight, useKg) + ' × ' + previous.reps : 'Première séance'}</Text></View><View style={{ flex: 1 }}><Text style={cardStyles.performanceLabel}>OBJECTIF SUGGÉRÉ</Text><Text style={[cardStyles.performanceValue, { color: COLORS.primary }]}>{target ? formatWeight(target.weight, useKg) + ' × ' + target.reps : 'Trouve ton rythme'}</Text></View></View>
+      {!pyramidEnabled && <View style={cardStyles.performance}><View style={{ flex: 1 }}><Text style={cardStyles.performanceLabel}>DERNIÈRE FOIS</Text><Text style={cardStyles.performanceValue}>{previous ? formatWeight(previous.weight, useKg) + ' × ' + previous.reps : 'Première séance'}</Text></View><View style={{ flex: 1, gap: 6 }}><Text style={cardStyles.performanceLabel}>{referenceValidated ? 'OBJECTIF · SÉRIES 2 OU 3' : 'SÉRIE 1 · RÉFÉRENCE'}</Text><Text style={[cardStyles.performanceValue, { color: COLORS.primary }]}>{displayedTarget ? formatWeight(displayedTarget.weight, useKg) + ' × ' + displayedTarget.reps : 'Trouve ton rythme'}</Text><Text style={{ color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 }}>{referenceValidated ? 'À tenter sur la deuxième ou troisième série.' : 'Commence par ta référence. La progression vient ensuite.'}</Text></View></View>}
       {isBodyweight && <PyramidControls exerciseId={exercise.id} onReload={onReload} />}
       <View style={cardStyles.columnsHeader}>
         <Text style={[cardStyles.colLabel, { flex: 0, width: 36 }]}>Série</Text>
@@ -498,6 +513,7 @@ function ExerciseCard({
 
       {exercise.sets.map((set, setIndex) => (
         <View key={set.id}>
+          {!pyramidEnabled && !parsePyramidSet(set.notes) && setIndex <= 2 && <Text style={{ color: setIndex === 0 ? COLORS.textSecondary : COLORS.primary, fontSize: 11, marginTop: 12, marginBottom: 5 }}>{setIndex === 0 ? `RÉFÉRENCE${reference ? ' · ' + formatWeight(reference.weight, useKg) + ' × ' + reference.reps : ' · Trouve ta charge et tes répétitions'}` : referenceValidated && progressionTarget ? `OBJECTIF À TENTER · ${formatWeight(progressionTarget.weight, useKg)} × ${progressionTarget.reps}` : 'La progression sera proposée après validation de la première série.'}</Text>}
           {parsePyramidSet(set.notes) && <Text style={{ color: COLORS.primary, fontSize: 10, marginTop: 12, marginBottom: 5 }}>PYRAMIDE · PALIER {parsePyramidSet(set.notes)!.index + 1} · OBJECTIF {parsePyramidSet(set.notes)!.targetReps} REPS</Text>}
           <SetRow
             set={set}

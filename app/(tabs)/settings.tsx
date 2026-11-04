@@ -18,6 +18,7 @@ import { Tutorial } from '../../components/Tutorial';
 import { TrainingPreferences } from '../../components/TrainingPreferences';
 import { BackupActions, clearPrivateBackupFiles } from '../../components/BackupActions';
 import { SettingsMenuRow as MenuRow } from '../../components/SettingsMenuRow';
+import { CreatineReminderSettings } from '../../components/CreatineReminderSettings';
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
@@ -76,10 +77,12 @@ export default function SettingsScreen() {
       </Panel>
 
       <Section title="Mes priorités" />
-      <Panel><Text style={s.muted}>Ce que j’ai envie de travailler en priorité.</Text><GoalSelector value={profile.goals} onChange={goals => profile.saveProfile(profile.name, goals)} /><View style={s.divider} /><Text style={s.eyebrow}>MON PROGRAMME</Text><Text style={s.programName}>{program?.name ?? 'Entraînement libre'}</Text><Action title="Voir les programmes" secondary onPress={() => router.push('/programs')} /></Panel>
+      <Panel><Text style={s.muted}>Ce que j’ai envie de travailler en priorité.</Text><GoalSelector value={profile.goals} onChange={goals => profile.saveProfile(profile.name, goals)} /><View style={s.divider} /><Text style={s.eyebrow}>MON PROGRAMME</Text><Text style={s.programName}>{program?.name ?? 'Sans programme · Mode libre'}</Text><Action title="Programme ou mode libre" secondary onPress={() => router.push('/programs')} /></Panel>
 
       <Section title="Mon entraînement" />
       <Panel><TrainingPreferences key={profile.setupRevision} /></Panel>
+      <Section title="Mes rappels" />
+      <Panel><CreatineReminderSettings key={profile.setupRevision} /></Panel>
       <Section title="Ma bibliothèque" />
       <Panel><MenuRow icon="add-circle-outline" title="Ajouter un exercice" description="Ma machine, ma variante, mon exercice" onPress={() => router.push('/exercises/new')} /></Panel>
 

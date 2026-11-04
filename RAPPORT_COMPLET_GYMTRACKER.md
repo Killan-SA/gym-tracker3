@@ -1,6 +1,6 @@
 # GymTracker — rapport complet des fonctionnalités
 
-État du projet au 29 octobre 2026.
+État du projet au 4 novembre 2026.
 
 Projet : `C:\Users\killa\Downloads\GymtrackerRefonteV2\GymtrackerRefonte`.
 
@@ -86,6 +86,7 @@ Les programmes disposent d’un aperçu de leurs séances. Le jour de programme 
 - Poids corporel utilisé comme charge par défaut pour les exercices concernés.
 - Dernière performance affichée sans prendre la séance courante comme référence.
 - Objectif indicatif de progression.
+- Première série sur la performance de référence ; après sa validation, objectif de progression à tenter sur la deuxième ou troisième série. Les indications sont affichées à côté des séries concernées et ne modifient pas les performances enregistrées.
 - Validation visuelle des séries et vibration.
 - Signalement d’un nouveau record.
 - Suppression d’une série par appui long sur sa validation, avec confirmation.
@@ -156,8 +157,11 @@ Les paliers non réalisés restent à zéro répétition et ne créent aucun fau
 - Retour à la séance sans arrêter le repos, avec accès pour le reprendre.
 - Affichage Repos terminé et bouton de retour à zéro.
 - Arrêt du repos à la fin de la séance.
+- Bouton fixé en bas après validation d’une série : démarrer le repos ou reprendre celui qui est déjà actif, sans remonter la liste.
+- Live Activity iOS sur l’écran verrouillé et dans la Dynamic Island des appareils compatibles.
+- Notification locale à la fin du repos si les notifications sont autorisées.
 
-Le décompte repose sur une heure de fin réelle, persistée avec son contexte. Il se recale après un passage en arrière-plan ou une réouverture. Un seul repos est actif à la fois. La vibration est délivrée quand l’app est active, ou au retour si iOS a suspendu JavaScript ; aucune alarme garantie pendant le verrouillage n’est activée.
+Le décompte repose sur une heure de fin réelle, persistée avec son contexte. Il se recale après un passage en arrière-plan ou une réouverture. Un seul repos est actif à la fois. La Live Activity utilise un compteur natif qui continue sans intervalle JavaScript en arrière-plan. Les changements de durée actualisent l’activité et l’alerte ; Passer ou terminer la séance les arrête. Le système iOS contrôle la livraison des notifications et la présentation de la Live Activity. Détails et essais : [NOTIFICATIONS_ET_REPOS.md](./NOTIFICATIONS_ET_REPOS.md).
 
 ## 13. Historique
 
@@ -209,6 +213,12 @@ Trois séances de musculation classées sur la période sont nécessaires avant 
 
 La réinitialisation confirmée efface les données personnelles locales, les notes, les préférences et les copies privées de sauvegarde, puis rouvre la configuration. Les fichiers déjà exportés par l’utilisateur dans Fichiers ne sont pas supprimés par cette action.
 
+## 16 bis. Rappel quotidien de créatine
+
+Dans Profil → Mes rappels, l’utilisateur peut activer un rappel à l’heure locale de son choix. Il est désactivé par défaut ; 09:00 est proposé comme heure initiale modifiable. Le rappel revient chaque jour, y compris les jours sans entraînement. Changer l’heure remplace la programmation existante et désactiver le rappel l’annule. L’autorisation iOS est demandée à l’activation ; un accès aux réglages est proposé en cas de refus.
+
+Le texte rappelle la routine sans recommander une quantité. La préférence est conservée localement et incluse dans la sauvegarde complète. La réinitialisation la supprime. La restauration resynchronise la préférence avec les autorisations du téléphone sans déclencher automatiquement une demande de permission.
+
 ## 17. Import et export Excel
 
 **Import** : fichiers `.xlsx` et `.xls`, sélection dans Fichiers, copie en cache puis lecture locale. Colonnes attendues : Date, Machine, Série facultative, Poids en kg et Rep. Prévisualisation, avertissements sur les lignes non exploitables et détection des dates déjà présentes avant enregistrement. Un modèle est fourni dans `examples/historique-exemple.xlsx`.
@@ -257,8 +267,8 @@ Les mises à jour sur l’iPhone doivent conserver cet identifiant et une signat
 
 ## 21. Contrôles et limites actuelles
 
-- 47 tests de régression réussis, avec SQLite isolé en mémoire et tests de logique.
-- 6 tests du sélecteur de fichiers réussis : 53 au total.
+- 53 tests de régression réussis, avec SQLite isolé en mémoire et tests de logique.
+- 6 tests du sélecteur de fichiers et 8 tests des fonctions système : 67 au total.
 - TypeScript : valide après la suppression du bouton de l’Historique.
 - Dernier export iOS : réussi ; cet export ne produit pas un IPA signé.
 - Dernier Expo Doctor : 20/20 contrôles réussis.
@@ -267,7 +277,7 @@ Les mises à jour sur l’iPhone doivent conserver cet identifiant et une signat
 
 Les essais physiques restent nécessaires pour le widget, les gestes iOS, le partage, les fichiers iCloud et les comportements en arrière-plan. Les alertes connues de dépendances de la chaîne Expo et leur analyse figurent dans [VERIFICATION.md](./VERIFICATION.md).
 
-La Live Activity du repos et la Dynamic Island sont une étape ultérieure. Aucun affichage actif du repos sur écran verrouillé, aucune synchronisation cloud automatique et aucune publication publique sur l’App Store ne sont activés par ce rapport.
+La Live Activity du repos et la Dynamic Island sont intégrées et restent à valider avec un nouveau build iOS sur appareil. Les notifications locales nécessitent aussi ce nouveau build et l’autorisation de l’utilisateur. Aucune synchronisation cloud automatique ni publication publique sur l’App Store n’est déclenchée par ces fonctions.
 
 ## 22. Envoyer le prochain build sur TestFlight
 

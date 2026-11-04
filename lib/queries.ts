@@ -828,13 +828,13 @@ export function getActiveProgramId(): string | null {
     'SELECT value FROM user_settings WHERE key = ?',
     ['currentProgramId']
   );
-  if (rowUser?.value) return rowUser.value;
+  if (rowUser) return rowUser.value.trim() || null;
 
   const row = db.getFirstSync<{ value: string }>(
     'SELECT value FROM app_settings WHERE key = ?',
     [ACTIVE_PROGRAM_KEY]
   );
-  return row?.value ?? null;
+  return row?.value.trim() || null;
 }
 
 /** Active un programme (et remet le compteur de jour à 0) */

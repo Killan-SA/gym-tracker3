@@ -49,7 +49,7 @@ Le widget reçoit un résumé calculé par l’app et un calendrier pour les pro
 
 ## Vérification
 
-53 tests : 47 tests SQLite/logique et 6 tests du sélecteur de fichiers. Couverture des anciennes migrations, notes et accents, déplacement 5 → 1, refus de listes invalides, suggestions, protection des séries, régularité, échéance du repos, sauvegarde complète, documents invalides et rollback après une panne SQLite simulée.
+67 tests : 53 tests SQLite/logique, 6 tests du sélecteur et 8 tests des notifications/Live Activities. Couverture des anciennes migrations, notes et accents, déplacement 5 → 1, refus de listes invalides, suggestions, protection des séries, régularité, échéance du repos, sauvegarde complète, documents invalides, rollback et rappels locaux.
 
 Le projet utilise Expo SDK 58 et React Native 0.88.1. Le widget utilise `com.killan.gymtracker.widgets` et le groupe `group.com.killan.gymtracker`. Documentation : https://docs.expo.dev/versions/v58.0.0/sdk/widgets/.
 
@@ -77,6 +77,6 @@ La signature Apple doit autoriser l’app, l’extension et le groupe partagé. 
 6. Exporter JSON et Excel vers Fichiers ; restaurer le JSON et comparer données, notes, préférences et programme ; exporter la copie de récupération.
 7. Ajouter les deux tailles de widget, changer programme et objectif, terminer une séance et vérifier le résumé ainsi que l’ouverture de l’app par appui.
 
-## Étape suivante : Live Activity
+## Live Activity et rappels
 
-La Live Activity et la Dynamic Island restent une étape ultérieure, conformément à l’ordre demandé : valider d’abord le timer plein écran sur un vrai iPhone. Aucun affichage du repos sur écran verrouillé n’est activé dans cette version.
+La Live Activity du repos, la Dynamic Island, l’alerte locale de fin et un rappel créatine configurable sont intégrés depuis le 4 novembre. Leur validation sur iPhone nécessite un nouveau build natif. Détails et tests : [NOTIFICATIONS_ET_REPOS.md](./NOTIFICATIONS_ET_REPOS.md).

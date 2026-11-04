@@ -14,6 +14,8 @@ import { finishTutorial, needsTutorial } from '../lib/tutorial';
 import { useRestTimerStore } from '../store/restTimerStore';
 import { startWidgetSync } from '../lib/widgetSync';
 import { RestTimerObserver } from '../components/RestTimerObserver';
+import { startLocalNotifications } from '../lib/localNotifications';
+import { startRestActivitySync } from '../lib/restActivitySync';
 
 // Empêche le splash screen de se fermer automatiquement
 SplashScreen.preventAutoHideAsync();
@@ -24,6 +26,8 @@ export default function RootLayout() {
   const pendingImport = useRef<InitialDataSource>('none');
   const setupRevision = useProfileStore(state => state.setupRevision);
   useEffect(() => startWidgetSync(), []);
+  useEffect(() => startLocalNotifications(), []);
+  useEffect(() => startRestActivitySync(), []);
   useEffect(() => {
     // Initialise la base de données au démarrage
     try {

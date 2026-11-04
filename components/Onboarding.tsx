@@ -80,6 +80,10 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
           {step === 1 && <>
             <Text style={s.title}>À ta façon, {cleanName(name)}.</Text>
             <Text style={s.description}>Les programmes correspondant à tes priorités apparaissent d’abord. Les classiques et le mode libre restent disponibles.</Text>
+            <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: program === null }} onPress={() => setProgram(null)} style={[s.choice, program === null && s.selected]}>
+              <View style={{ flex: 1, gap: 7 }}><Text style={s.choiceTitle}>Sans programme · Mode libre</Text><Text style={s.small}>Je choisis mes exercices et mon rythme à chaque séance.</Text></View>
+              <Ionicons name={program === null ? 'radio-button-on' : 'radio-button-off'} size={24} color={program === null ? COLORS.primary : COLORS.textMuted} />
+            </TouchableOpacity>
             {getProgramsForGoals(goals).map(p => {
               const recommended = goals.some(goal => p.id === `focus-${goal}`);
               const selected = program === p.id;
@@ -93,10 +97,6 @@ export function Onboarding({ visible, onComplete, onDismiss }: Props) {
                 <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={24} color={selected ? COLORS.primary : COLORS.textMuted} />
               </TouchableOpacity>;
             })}
-            <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: program === null }} onPress={() => setProgram(null)} style={[s.choice, program === null && s.selected]}>
-              <View style={{ flex: 1, gap: 7 }}><Text style={s.choiceTitle}>Entraînement libre</Text><Text style={s.small}>Je choisis mes exercices à chaque séance.</Text></View>
-              <Ionicons name={program === null ? 'radio-button-on' : 'radio-button-off'} size={24} color={program === null ? COLORS.primary : COLORS.textMuted} />
-            </TouchableOpacity>
           </>}
 
           {step === 2 && <>

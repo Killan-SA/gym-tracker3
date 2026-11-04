@@ -63,11 +63,10 @@ export default function ProgramsScreen() {
   };
 
   const handleDeactivate = () => {
-    Alert.alert('Désactiver le programme', 'Tu pourras en choisir un autre à tout moment.', [
+    Alert.alert('Passer sans programme ?', 'Tu choisiras librement tes exercices à chaque séance. Tes séances précédentes restent dans ton historique.', [
       { text: 'Annuler', style: 'cancel' },
       {
-        text: 'Désactiver',
-        style: 'destructive',
+        text: 'Choisir le mode libre',
         onPress: () => {
           setActiveProgram(null);
           useSettingsStore.getState().setCurrentProgram(null);
@@ -112,14 +111,18 @@ export default function ProgramsScreen() {
           </View>
 
           <TouchableOpacity style={styles.deactivateBtn} onPress={handleDeactivate}>
-            <Text style={styles.deactivateBtnText}>Désactiver ce programme</Text>
+            <Text style={styles.deactivateBtnText}>Passer sans programme · Mode libre</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <Text style={styles.intro}>
-          Choisis un programme et GymTracker te proposera automatiquement le bon jour à chaque séance.
+          En mode libre, tu choisis tes exercices à chaque séance. Tu peux aussi suivre l’un des programmes ci-dessous.
         </Text>
       )}
+
+      <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: activeProgramId === null }} onPress={() => { if (activeProgramId) handleDeactivate(); }} style={[styles.programCard, activeProgramId === null && styles.programCardActive]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}><View style={{ flex: 1, gap: 8 }}><Text style={styles.programName}>Sans programme · Mode libre</Text><Text style={{ color: COLORS.textSecondary, fontSize: 13, lineHeight: 20 }}>Je compose chaque séance avec les exercices de mon choix.</Text></View><Ionicons name={activeProgramId === null ? 'radio-button-on' : 'radio-button-off'} size={25} color={COLORS.primary} /></View>
+      </TouchableOpacity>
 
       {/* ── Liste des programmes ───────────────────────────── */}
       <Text style={styles.sectionTitle}>Mes priorités</Text>

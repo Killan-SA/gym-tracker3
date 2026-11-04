@@ -1,5 +1,7 @@
 # GymTracker — Refonte
 
+Les ajouts du 4 novembre (bouton de repos en bas, mode sans programme, Live Activity et rappel créatine) sont détaillés dans [NOTIFICATIONS_ET_REPOS.md](./NOTIFICATIONS_ET_REPOS.md).
+
 Le [rapport complet des fonctionnalités et les commandes TestFlight](./RAPPORT_COMPLET_GYMTRACKER.md) récapitulent l’ensemble de l’application.
 
 Les nouvelles fonctions pour les séances en salle et leurs essais sur iPhone sont décrits dans [AMELIORATIONS_SEANCE.md](./AMELIORATIONS_SEANCE.md) : notes, déplacement, remplacement, régularité hebdomadaire, repos plein écran, sauvegardes et widget.
@@ -28,7 +30,7 @@ Le clavier numérique iOS dispose d’un bouton **Terminé** dans le profil, le 
 
 - Accueil : prochaine séance du programme, démarrage direct, séance libre, volume sur 7 jours, records, historique récent et suggestion issue de l’historique.
 - Séance : cartes illustrées, dernière performance hors séance courante, objectif indicatif de double progression, poids/répétitions/RPE, validation avec vibration, appui long sur la validation pour supprimer une série. Les saisies restent enregistrées à la sortie du champ, comme dans l’original ; la coche sert à suivre visuellement les séries réalisées.
-- Repos : écran plein écran, durée initiale 90 s, choix 60/90/120/180 s, −15 s, +30 s et Passer. Déclenchement manuel ou automatique après validation selon le réglage du profil. Échéance réelle persistée et recalcul au retour de l’app. Vibration dans l’app active ou au retour ; aucune notification de fin en arrière-plan.
+- Repos : écran plein écran, durée initiale 90 s, choix 60/90/120/180 s, −15 s, +30 s et Passer. Bouton inférieur après validation pour démarrer ou reprendre le chrono. Déclenchement manuel ou automatique, échéance persistée, Live Activity iOS et notification locale de fin si autorisée.
 - Exercices : bibliothèque complète dès la première ouverture, recherche sans accents, catégories, favoris SQLite et bouton Ajouter un exercice. Le formulaire permet de choisir le nom et le groupe musculaire, vérifie les doublons sans tenir compte des accents/casse et enregistre l’exercice pour les prochaines séances.
 - Fiche exercice : illustration, muscles, favoris, records et graphiques existants, périodes et métriques, consignes et erreurs fréquentes pour les exercices prédéfinis.
 - Historique : liste et calendrier conservés, noms des nouvelles séances de programme, nombre de séries, volume, durée des nouvelles séances terminées, détail avec RPE.
@@ -96,10 +98,11 @@ Une compilation iOS signée et l’envoi TestFlight/App Store nécessitent les a
 npm run typecheck
 npm run test:regression
 npm run test:import-picker
+npm run test:system-features
 npm run check:ios
 ```
 
-Les 47 tests de régression utilisent SQLite en mémoire avec Node 22 : anciennes données et migrations, CRUD, historique, favoris, programmes, conversions, statistiques, import XLSX, onboarding, tutoriel, pyramides, notes machine, ordre des exercices, remplacement sans perte de séries, régularité hebdomadaire, repos, sauvegarde, restauration et rollback. Six tests supplémentaires vérifient le sélecteur de fichiers. L’export vérifie le bundling iOS ; il ne produit pas un fichier IPA.
+Les 53 tests de régression utilisent SQLite en mémoire avec Node 22 : anciennes données et migrations, CRUD, historique, favoris, programmes, conversions, statistiques, import XLSX, onboarding, tutoriel, pyramides, notes machine, ordre des exercices, remplacement sans perte de séries, régularité hebdomadaire, repos, sauvegarde, restauration et rollback. Six tests supplémentaires vérifient le sélecteur de fichiers. L’export vérifie le bundling iOS ; il ne produit pas un fichier IPA.
 
 À valider sur iPhone : bouton Terminé et clavier kg/reps/RPE, premier démarrage vierge et reprise après fermeture, vibration, repos après verrouillage, cadrage des images, appui long de suppression, import depuis Fichiers et mise à jour sur une installation contenant déjà des données. Aucun simulateur iOS ou iPhone n’était connecté pendant cette réalisation.
 

@@ -1,10 +1,18 @@
 # Vérification du projet
 
+## Ajouts du 4 novembre 2026
+
+Progression par série : la première conserve la référence historique ; après validation, la progression est proposée sur la deuxième ou troisième série. Trois tests supplémentaires vérifient ce décalage, le poids du corps et l’absence de faux records. Les 53 tests de régression passent et TypeScript est valide ; avec les 6 tests du sélecteur et 8 tests système existants, la suite comprend 67 tests.
+
+Bouton inférieur de repos, mode sans programme prioritaire, Live Activity iOS du repos, alerte locale de fin et rappel créatine configurable : [NOTIFICATIONS_ET_REPOS.md](./NOTIFICATIONS_ET_REPOS.md). Le choix explicite du mode libre prime désormais sur un ancien programme encore présent dans les préférences historiques. Aucun changement de schéma SQLite n’est nécessaire.
+
+Les contrôles fonctionnels comprennent désormais 53 tests SQLite/logique, 6 tests du sélecteur et 8 tests système, soit 67. Les API natives de notifications et d’ActivityKit sont vérifiées par des adaptateurs ; leur rendu et livraison sur un vrai iPhone restent à valider dans le nouveau build natif. Les dépendances sont alignées sur les versions recommandées du SDK 58, dont Expo 58.0.23, Expo Widgets/Expo UI 58.0.27 et Safe Area Context 5.11.1.
+
 ## Fonctions pour les séances en salle
 
 Notes persistantes, déplacement des exercices, alternatives locales préservant les séries, régularité hebdomadaire, repos plein écran, sauvegarde/restauration JSON, export Excel et widget iPhone : détails et parcours de validation dans [AMELIORATIONS_SEANCE.md](./AMELIORATIONS_SEANCE.md).
 
-Les contrôles finaux réussissent : 47 tests de régression, 6 tests du sélecteur, TypeScript, Expo Doctor 20/20 et export iOS. Le rollback de restauration est vérifié par une panne SQLite simulée après suppression et début de réinsertion. Le banc de tests refuse aussi les transactions Expo imbriquées. L’introspection Expo confirme l’extension du widget et les entitlements du groupe partagé. React Native est aligné sur le correctif 0.88.1 attendu par Expo. Les interactions natives et le widget restent à confirmer sur iPhone ; la Live Activity attend cette validation du timer.
+Les contrôles finaux réussissent : 53 tests de régression, 6 tests du sélecteur, 8 tests système, TypeScript, Expo Doctor 20/20 et export iOS. Le rollback de restauration est vérifié par une panne SQLite simulée après suppression et début de réinsertion. Le banc de tests refuse aussi les transactions Expo imbriquées. L’introspection Expo confirme l’extension du widget, le groupe partagé et le support Live Activities. Les interactions natives, le widget, la Live Activity et les notifications restent à confirmer sur iPhone dans le nouveau build.
 
 ## Correction de l’import TestFlight
 
@@ -31,23 +39,14 @@ La génération des tailles natives est effectuée par Expo pendant la compilati
 ## Contrôles effectués
 
 - TypeScript : réussi.
-- Régression SQLite et logique : 47 tests réussis, dont anciennes migrations, import Excel, programmes, tutoriel, notes, réorganisation, remplacement, régularité, repos, sauvegardes et rollback. Six tests supplémentaires vérifient le sélecteur de fichiers.
+- Régression SQLite et logique : 53 tests réussis, dont anciennes migrations, import Excel, programmes, mode libre, tutoriel, notes, réorganisation, remplacement, régularité, repos, sauvegardes et rappel créatine. Six tests vérifient le sélecteur de fichiers et huit les notifications/Live Activities.
 - Expo Doctor : 20/20 contrôles réussis.
 - Introspection des plugins natifs Expo : réussie, configuration iOS générée sans erreur.
 - Export du bundle iOS : réussi avec les 78 assets attendus, dont le nouveau logo et les 35 images d’exercices ; cet export est distinct d’une compilation native signée.
 
 ## Alertes de dépendances restantes
 
-Après les correctifs compatibles, npm signale encore **8 paquets affectés : 5 alertes basses et 3 hautes**, sans alerte critique. Les deux avis amont sont :
-
-| Dépendance | Chaîne observée | État |
-| --- | --- | --- |
-| `deepmerge` 4.3.1 | Expo → `@expo/config` | Aucun correctif publié selon GHSA-gcqx-w48m-w2h4. |
-| `zod` 3.25.76 | Expo → `@expo/cli` | Le correctif annoncé est en 4.6.6, hors de la plage majeure 3 demandée par cette version d’Expo CLI. |
-
-Ces dépendances appartiennent aux outils Expo de configuration et de développement du projet. Les paquets Expo qui en dépendent héritent aussi des alertes, d’où le total de huit. Ce résultat ne constitue pas une preuve d’absence de risque. Aucune rétrogradation du SDK ni substitution majeure forcée de dépendance n’a été appliquée.
-
-Avis officiels : https://github.com/advisories/GHSA-gcqx-w48m-w2h4 et https://github.com/advisories/GHSA-mrhx-c7xc-m3w5. Suivre une mise à jour compatible de la chaîne Expo puis relancer `npm audit`.
+Après l’alignement compatible du SDK 58 le 4 novembre, le résumé npm signale **5 vulnérabilités modérées**, sans alerte haute ou critique dans ce résumé. Ce résultat remplace le relevé précédent du 29 octobre. Aucun `npm audit fix --force`, changement forcé de version majeure ou rétrogradation du SDK n’a été appliqué. Le détail des avis et des éventuelles corrections reste consultable avec `npm audit`.
 
 ## Validation encore nécessaire
 

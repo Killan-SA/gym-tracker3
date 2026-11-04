@@ -593,5 +593,57 @@ test('Visible replacement scores distinguish movements and expose limited custom
   assert.equal(alternatives.getExerciseReplacementScore('Inconnu', custom).score, null);
   assert.ok(alternatives.getExerciseAlternatives('Lat pulldown').every(row => row.score <= alternatives.MAX_REPLACEMENT_SCORE));
 });
+test('Creatine reminder is opt-in, validates clock boundaries and recovers from malformed preferences', () => isolated(() => {
+  const reminders = require('../lib/reminderSettings.ts');
+  assert.deepEqual(reminders.getCreatineReminder(), { enabled: false, hour: 9, minute: 0 });
+  reminders.setCreatineReminder({ enabled: true, hour: 0, minute: 0 }); assert.equal(reminders.getCreatineReminder().hour, 0);
+  reminders.setCreatineReminder({ enabled: true, hour: 23, minute: 59 }); assert.equal(reminders.getCreatineReminder().minute, 59);
+  for (const value of [{ enabled: true, hour: 24, minute: 0 }, { enabled: true, hour: 12, minute: 60 }, { enabled: true, hour: -1, minute: 0 }, { enabled: 'yes', hour: 9, minute: 0 }]) assert.throws(() => reminders.setCreatineReminder(value));
+  db.setUserSetting('creatine_reminder', 'broken'); assert.equal(reminders.getCreatineReminder().enabled, false);
+}));
+test('Creatine reminder survives backup restoration and full reset removes it', () => isolated(() => {
+  const reminders = require('../lib/reminderSettings.ts');
+  reminders.setCreatineReminder({ enabled: true, hour: 18, minute: 30 }); const exported = backup.createBackup();
+  db.resetAllData(); assert.equal(reminders.getCreatineReminder().enabled, false);
+  backup.restoreBackup(exported); assert.deepEqual(reminders.getCreatineReminder(), { enabled: true, hour: 18, minute: 30 });
+}));
+test('Choosing no program clears both program preferences and preserves workout history and profile', () => isolated(() => {
+  const count = q.getAllSessions().length; db.setUserSetting('display_name', 'Kilian');
+  const s = q.createSession(); const ex = q.addExerciseToSession(s.id, 'Pompes'); q.addSet(ex.id, 70, 10);
+  useSettingsStore.getState().setCurrentProgram('ppl'); useSettingsStore.getState().setCurrentProgram(null);
+  assert.equal(q.getActiveProgramId(), null); assert.equal(useSettingsStore.getState().currentProgramId, null);
+  db.setAppSetting('active_program_id', 'ppl'); useSettingsStore.getState().loadSettings();
+  assert.equal(q.getActiveProgramId(), null); assert.equal(useSettingsStore.getState().currentProgramId, null, 'An explicit free-mode choice must win over a stale legacy program');
+  assert.equal(q.getAllSessions().length, count + 1); assert.equal(q.getSessionVolume(s.id), 700);
+  assert.equal(db.getUserSetting('display_name'), 'Kilian');
+  assert.equal(require('../lib/widgetSummary.ts').getWidgetSummary().nextWorkout, 'Séance libre');
+}));
+test('First classic set keeps the reference and progression is only suggested for the second or third', () => {
+  const { getClassicSetSuggestion } = require('../lib/progression.ts');
+  const previous = { weight: 25, reps: 10 };
+  assert.deepEqual(getClassicSetSuggestion(previous, 'Curl haltère', 0), { weight: 25, reps: 10 });
+  assert.deepEqual(getClassicSetSuggestion(previous, 'Curl haltère', 1), { weight: 25, reps: 11 });
+  assert.deepEqual(getClassicSetSuggestion(previous, 'Curl haltère', 2), { weight: 25, reps: 11 });
+  assert.equal(getClassicSetSuggestion(previous, 'Curl haltère', 3), null);
+  assert.deepEqual(previous, { weight: 25, reps: 10 });
+});
+test('Load increases wait until later sets and bodyweight progress only adds repetitions', () => {
+  const { getClassicSetSuggestion } = require('../lib/progression.ts');
+  const previous = { weight: 80, reps: 12 };
+  assert.deepEqual(getClassicSetSuggestion(previous, 'Développé couché Smith', 0), { weight: 80, reps: 12 });
+  assert.deepEqual(getClassicSetSuggestion(previous, 'Développé couché Smith', 1), { weight: 82.5, reps: 8 });
+  assert.deepEqual(getClassicSetSuggestion(previous, 'Pompes', 1), { weight: 80, reps: 13 });
+  assert.equal(getClassicSetSuggestion(null, 'Pompes', 0), null);
+  assert.equal(getClassicSetSuggestion({ weight: 0, reps: 0 }, 'Pompes', 1), null);
+});
+test('Displaying a later-set target never creates a record or changes saved workout data', () => isolated(() => {
+  const { getClassicSetSuggestion } = require('../lib/progression.ts');
+  const s = q.createSession(); const ex = q.addExerciseToSession(s.id, 'Ma machine progression');
+  q.addSet(ex.id, 80, 12);
+  const before = JSON.stringify(q.getSessionWithExercises(s.id));
+  assert.deepEqual(getClassicSetSuggestion({ weight: 80, reps: 12 }, ex.name, 1), { weight: 82.5, reps: 8 });
+  assert.equal(JSON.stringify(q.getSessionWithExercises(s.id)), before);
+  assert.equal(q.getExercisePersonalRecord(ex.name), 80);
+}));
 database.close();
 process.stdout.write(`${passed} regression checks passed.\n`);
