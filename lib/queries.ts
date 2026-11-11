@@ -50,6 +50,7 @@ export function createSession(notes?: string): Session {
     'INSERT INTO sessions (id, date, notes, created_at) VALUES (?, ?, ?, ?)',
     [session.id, session.date, session.notes, session.created_at]
   );
+  setUserSetting(`session_in_progress:${session.id}`, '1');
   return session;
 }
 

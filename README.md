@@ -1,5 +1,7 @@
 # GymTracker — Refonte
 
+Le **Coach GymTracker** du 6 novembre ajoute un moteur local RPE/double progression, check-in, récupération, tendances et plateaux, objectifs personnels et propositions de programmes. Parcours, règles exactes, stockage, 59 tests dédiés et essais iPhone : [COACH_GYMTRACKER.md](./COACH_GYMTRACKER.md).
+
 Les ajouts du 4 novembre (bouton de repos en bas, mode sans programme, Live Activity et rappel créatine) sont détaillés dans [NOTIFICATIONS_ET_REPOS.md](./NOTIFICATIONS_ET_REPOS.md).
 
 Le [rapport complet des fonctionnalités et les commandes TestFlight](./RAPPORT_COMPLET_GYMTRACKER.md) récapitulent l’ensemble de l’application.
@@ -99,10 +101,11 @@ npm run typecheck
 npm run test:regression
 npm run test:import-picker
 npm run test:system-features
+npm run test:coach
 npm run check:ios
 ```
 
-Les 53 tests de régression utilisent SQLite en mémoire avec Node 22 : anciennes données et migrations, CRUD, historique, favoris, programmes, conversions, statistiques, import XLSX, onboarding, tutoriel, pyramides, notes machine, ordre des exercices, remplacement sans perte de séries, régularité hebdomadaire, repos, sauvegarde, restauration et rollback. Six tests supplémentaires vérifient le sélecteur de fichiers. L’export vérifie le bundling iOS ; il ne produit pas un fichier IPA.
+Les 56 tests de régression utilisent SQLite en mémoire avec Node 22 : anciennes données et migrations, CRUD, historique, favoris, programmes, conversions, statistiques, import XLSX, onboarding, tutoriel, pyramides, notes machine, ordre des exercices, remplacement sans perte de séries, régularité hebdomadaire, repos, sauvegarde, restauration et rollback. Six tests supplémentaires vérifient le sélecteur de fichiers. L’export vérifie le bundling iOS ; il ne produit pas un fichier IPA.
 
 À valider sur iPhone : bouton Terminé et clavier kg/reps/RPE, premier démarrage vierge et reprise après fermeture, vibration, repos après verrouillage, cadrage des images, appui long de suppression, import depuis Fichiers et mise à jour sur une installation contenant déjà des données. Aucun simulateur iOS ou iPhone n’était connecté pendant cette réalisation.
 

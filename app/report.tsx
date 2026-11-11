@@ -7,12 +7,11 @@ import { MuscleMap, MUSCLE_COLORS } from '../components/MuscleMap';
 import { COLORS } from '../constants/theme';
 import { getTrainingBalance, getTrainingPeriodStats, recommendBalanceProgram, getVolumeComparisons } from '../lib/trainingBalance';
 import type { MuscleId } from '../lib/trainingBalance';
-import { getTotalVolumeAllTime, getWeeklyReport, getFrequentSessionTemplates, createSessionFromTemplate, getSmartSessionRecommendation } from '../lib/queries';
+import { getTotalVolumeAllTime, getWeeklyReport, getFrequentSessionTemplates, getSmartSessionRecommendation } from '../lib/queries';
 import type { SessionTemplate } from '../lib/queries';
 import { formatVolume, formatWeight } from '../lib/units';
 import { useSettingsStore } from '../store/settings';
 import { useAppTheme } from '../lib/themes';
-import { setSessionTitle } from '../lib/redesign';
 
 function readReport(days: number) {
   return { balance: getTrainingBalance(days), period: getTrainingPeriodStats(days), total: getTotalVolumeAllTime(), weekly: getWeeklyReport(), templates: getFrequentSessionTemplates(), plateau: getSmartSessionRecommendation() };
@@ -47,7 +46,7 @@ export default function ReportScreen() {
   const startTemplate = (template: SessionTemplate) => {
     Alert.alert('Refaire cette séance ?', template.exercises.map(ex => ex.name).join('\n'), [
       { text: 'Annuler', style: 'cancel' },
-      { text: 'Commencer', onPress: () => { const id = createSessionFromTemplate(template); setSessionTitle(id, 'Séance habituelle'); router.push(`/session/${id}`); } },
+      { text: 'Commencer', onPress: () => { router.push({ pathname: '/prepare', params: { names: JSON.stringify(template.exercises.map(ex => ex.name)), title: 'Séance habituelle' } }); } },
     ]);
   };
 

@@ -1,14 +1,17 @@
 # GymTracker — rapport complet des fonctionnalités
 
-État du projet au 4 novembre 2026.
+État du code local au 6 novembre 2026. Ce rapport décrit le projet présent dans ce dossier ; une ancienne version installée sur TestFlight ne contient pas nécessairement les derniers ajouts.
 
 Projet : `C:\Users\killa\Downloads\GymtrackerRefonteV2\GymtrackerRefonte`.
 
 GymTracker est une application de suivi de musculation destinée à l’iPhone. Elle fonctionne localement, sans compte utilisateur ni serveur de stockage GymTracker. Ses cinq onglets sont Accueil, Exercices, Historique, Stats et Profil.
 
+Le **Coach GymTracker** est intégré : check-in facultatif, conseils RPE/double progression, récupération, analyse musculaire, plateaux, bilan quatre semaines, objectifs personnels et programmes adaptés. Le [rapport du Coach](./COACH_GYMTRACKER.md) décrit les règles exactes, exemples, données, tests et limites de ces ajouts. Le coach fonctionne hors ligne et ne modifie pas automatiquement les séries réalisées ni le programme actif.
+
 ## 1. Identité et interface
 
 - Thème sombre avec accent vert GymTracker et choix de couleurs dans le profil.
+- Six couleurs proposées : bleu, violet, vert, rouge, orange et indigo.
 - Cartes, boutons et écrans harmonisés.
 - Logo K néon avec haltère fourni par l’utilisateur : accueil, configuration initiale, tutoriel, icône iOS et écran de lancement.
 - Illustrations locales pour les exercices, disponibles sans connexion.
@@ -48,6 +51,7 @@ La suppression complète des données repropose cette configuration. L’import 
 - Mise en avant d’un record personnel.
 - Trois séances récentes avec accès à leur détail.
 - Suggestion d’entraînement à partir de l’historique, avec aperçu avant démarrage.
+- Cartes des séances commencées et non terminées, avec accès direct pour les reprendre. Tant qu’une séance reste en cours, le bouton principal privilégie sa reprise.
 
 ## 5. Programmes
 
@@ -94,6 +98,17 @@ Les programmes disposent d’un aperçu de leurs séances. Le jour de programme 
 - Fin de séance confirmée et durée enregistrée sans écraser une durée déjà existante.
 
 Les champs sont sauvegardés à la sortie de la saisie, comme dans l’application initiale. La coche sert à suivre la réalisation ; une série enregistrée peut donc exister sans coche. Les séries à zéro répétition n’ajoutent ni volume, ni record, ni point de progression.
+
+### Quitter, reprendre et modifier
+
+- Bouton « Revenir à l’accueil » et icône maison pour utiliser les autres onglets sans terminer la séance.
+- Reprise depuis l’accueil, sur le même enregistrement, avec conservation des exercices et séries, sans avancer de nouveau le programme.
+- État en cours conservé après fermeture de l’application et après minuit.
+- Modification possible depuis le détail de l’historique pour une séance du jour, même terminée ; sa durée initiale reste conservée.
+- Les séances explicitement marquées en cours peuvent également être reprises un autre jour. Un import Excel ne reçoit pas automatiquement ce statut.
+- Le compteur de durée mesure le temps depuis la création, y compris le temps passé hors de l’écran : revenir à l’accueil ne le met pas en pause.
+
+Détails et essais sur appareil : [REPRISE_SEANCE.md](./REPRISE_SEANCE.md).
 
 ## 8. Réorganisation par glisser-déposer
 
@@ -160,6 +175,7 @@ Les paliers non réalisés restent à zéro répétition et ne créent aucun fau
 - Bouton fixé en bas après validation d’une série : démarrer le repos ou reprendre celui qui est déjà actif, sans remonter la liste.
 - Live Activity iOS sur l’écran verrouillé et dans la Dynamic Island des appareils compatibles.
 - Notification locale à la fin du repos si les notifications sont autorisées.
+- Dynamic Island compacte : icône à gauche et temps restant à droite dans une largeur réservée. Présentation minimale : compteur à la place de l’icône seule. Les chiffres ont une largeur stable et leur taille peut diminuer pour tenir dans l’espace disponible.
 
 Le décompte repose sur une heure de fin réelle, persistée avec son contexte. Il se recale après un passage en arrière-plan ou une réouverture. Un seul repos est actif à la fois. La Live Activity utilise un compteur natif qui continue sans intervalle JavaScript en arrière-plan. Les changements de durée actualisent l’activité et l’alerte ; Passer ou terminer la séance les arrête. Le système iOS contrôle la livraison des notifications et la présentation de la Live Activity. Détails et essais : [NOTIFICATIONS_ET_REPOS.md](./NOTIFICATIONS_ET_REPOS.md).
 
@@ -170,6 +186,7 @@ Le décompte repose sur une heure de fin réelle, persistée avec son contexte. 
 - Titre, date, durée disponible, nombre de séries et volume.
 - Détail des exercices, charges, répétitions, RPE et pyramides.
 - Suppression d’une séance avec confirmation.
+- Accès à la modification des séances du jour et à la reprise des séances marquées en cours.
 
 Le bouton Importer mon historique Excel a été retiré de cet onglet. L’import est regroupé dans Profil → Mes données et reste proposé au démarrage.
 
@@ -267,11 +284,12 @@ Les mises à jour sur l’iPhone doivent conserver cet identifiant et une signat
 
 ## 21. Contrôles et limites actuelles
 
-- 53 tests de régression réussis, avec SQLite isolé en mémoire et tests de logique.
-- 6 tests du sélecteur de fichiers et 8 tests des fonctions système : 67 au total.
-- TypeScript : valide après la suppression du bouton de l’Historique.
+- 56 tests de régression réussis, avec SQLite isolé en mémoire et tests de logique, dont les cas de reprise des séances.
+- 6 tests du sélecteur de fichiers et 8 tests des fonctions système : 70 au total.
+- 59 tests dédiés au Coach s’ajoutent à ces 70 contrôles : **129 tests au total** après son intégration.
+- TypeScript : valide après les ajouts de reprise et d’affichage Dynamic Island.
 - Dernier export iOS : réussi ; cet export ne produit pas un IPA signé.
-- Dernier Expo Doctor : 20/20 contrôles réussis.
+- Dernier Expo Doctor documenté le 4 novembre : 20/20 contrôles réussis ; il n’a pas été relancé pour ce compte rendu.
 - Restauration testée avec une panne SQLite simulée pour vérifier le rollback.
 - Préservation des séries et notes testée après réorganisation et remplacement.
 
@@ -320,3 +338,85 @@ Après l’envoi, attendre le traitement Apple puis ouvrir App Store Connect →
 L’envoi rend le build disponible dans le parcours TestFlight après traitement ; une publication publique demande une soumission distincte à App Review. Voir le [guide officiel EAS Submit pour iOS](https://docs.expo.dev/submit/ios/).
 
 Aucune compilation signée ni soumission à Apple n’a été lancée pendant cette intervention : les commandes ci-dessus sont prêtes à être exécutées par l’utilisateur.
+
+## 23. Technologies et outils utilisés
+
+Versions déclarées dans le `package.json` local ; les préfixes `~` et `^` définissent les plages autorisées à l’installation.
+
+| Technologie | Version déclarée | Usage |
+| --- | --- | --- |
+| Expo | ~58.0.23 | Environnement mobile, outils de développement et modules natifs. |
+| React Native | 0.88.1 | Interface mobile. |
+| React | 19.3.0 | Composants et interactions. |
+| TypeScript | ~6.0.3 | Typage et vérification du code. |
+| Expo Router | ~58.0.30 | Navigation par fichiers, onglets et écrans. |
+| Zustand | ^4.5.4 | État en mémoire du profil, des préférences et du repos. |
+| Expo SQLite | ~58.0.15 | Stockage local persistant et requêtes statistiques. |
+| Expo Widgets | ~58.0.27 | Widget iPhone et Live Activities. |
+| Expo UI | ~58.0.27 | Composants SwiftUI du widget et de la Live Activity. |
+| Expo Notifications | ~58.1.8 | Alertes locales de fin du repos et rappel créatine. |
+| Expo Document Picker | ~58.0.0 | Sélection des fichiers Excel et JSON. |
+| Expo File System | ~58.0.0 | Lecture des imports et écriture des sauvegardes. |
+| Expo Sharing | ~58.0.22 | Partage des exports et sauvegardes. |
+| SheetJS / xlsx | 0.20.3, archive locale | Lecture et génération Excel ; archive conservée dans `vendor/`. |
+| React Native Gifted Charts | ^1.4.20 | Graphiques de progression. |
+| React Native SVG | 15.16.0 | Dessins vectoriels, carte musculaire et graphiques. |
+| Gesture Handler / Reanimated / Worklets | ~3.3.0 / 4.7.1 / ~0.13.0 | Infrastructure de gestes et d’animations ; réorganisation gérée par un composant local utilisant PanResponder et FlatList. |
+| Day.js | ^1.11.12 | Dates et affichage français. |
+| Safe Area Context / Screens | ~5.11.1 / ~4.30.1 | Marges système et écrans natifs. |
+| Expo Vector Icons | ^15.0.2 | Icônes de l’interface. |
+| Expo Asset, Font, Splash Screen, Status Bar, Linear Gradient | Modules Expo | Images embarquées, polices et présentation visuelle. |
+| Expo Linking | ~58.0.16 | Ouverture de l’app et liens internes. |
+| Expo Dev Client | ~58.0.18 | Client de développement intégrant les modules natifs. |
+| EAS Build / EAS Submit | CLI ≥ 25.3.0 dans la configuration | Compilation iOS distante et envoi vers App Store Connect. |
+| Node.js et SQLite en mémoire | Banc de tests local | Tests de données et logique sans toucher à la base du téléphone. |
+
+Les illustrations d’exercices ont été créées avec imagegen puis embarquées dans le projet ; aucune génération d’image ne s’exécute dans l’application. Le logo est celui fourni par l’utilisateur.
+
+## 24. Organisation du code et des données
+
+| Dossier | Contenu |
+| --- | --- |
+| `app/` | Cinq onglets et écrans de séance, repos, détail historique, fiche exercice, programmes, bilan et imports. |
+| `components/` | Cartes et boutons communs, onboarding, tutoriel, carte musculaire, pyramides, notes/remplacements, sauvegardes et préférences. |
+| `lib/` | Requêtes SQLite, migrations, import/export, calculs de progression et bilan, règles de remplacement, notifications et synchronisation des widgets. |
+| `store/` | Stores Zustand du profil, des réglages et du chrono. |
+| `widgets/` | Présentation du widget d’accueil et de la Live Activity du repos. |
+| `constants/` | Exercices, catégories, consignes et éléments de thème. |
+| `assets/` | Logo, images des exercices et autres ressources embarquées. |
+| `tests/` | Régression SQLite/logique, sélecteur de fichiers et adaptateurs des fonctions natives. |
+| `examples/` | Fichier Excel d’exemple. |
+| `vendor/` | Archive locale SheetJS. |
+
+La base locale `gymtracker.db` contient huit tables applicatives :
+
+| Table | Données |
+| --- | --- |
+| `sessions` | Dates et informations générales des séances. |
+| `exercises` | Exercices d’une séance, ordre et notes propres à cette séance. |
+| `sets` | Numéro de série, charge, répétitions, RPE et métadonnées. |
+| `custom_exercises` | Catalogue créé par l’utilisateur. |
+| `exercise_names` | Noms connus pour les suggestions de saisie. |
+| `app_settings` | Réglages historiques. |
+| `user_settings` | Préférences, profil, programme, favoris, tutoriel, durées, validations, pyramides et séances en cours. |
+| `exercise_notes` | Notes machine persistantes. |
+
+Les migrations sont conservées jusqu’à la version 4. Les opérations sensibles, notamment la restauration, utilisent des transactions. Les stores en mémoire sont rechargés depuis les données persistantes. Les événements de changement déclenchent les synchronisations concernées.
+
+L’application ne contient pas de backend GymTracker, de compte utilisateur, de synchronisation cloud automatique ou d’appel à une IA distante. Les suggestions de programmes, de progression et de remplacement sont des règles locales. Le choix d’un fichier dans iCloud reste une action manuelle via Fichiers ; il ne constitue pas une synchronisation de la base.
+
+Configuration iOS : nom GymTracker, version marketing 1.0.0, portrait, interface sombre et cible iPhone (`supportsTablet: false`). Identifiant `com.killan.gymtracker`, schéma de lien `gymtracker`, extension `com.killan.gymtracker.widgets` et groupe partagé `group.com.killan.gymtracker`. La configuration contient encore une entrée Android historique, mais la cible de développement et de validation demandée est iOS ; le widget Android est désactivé.
+
+## 25. État livré et limites à connaître
+
+- **Présent dans le code local** : fonctionnalités décrites dans ce rapport, dont reprise des séances et compteur dans les vues compacte/minimale de la Dynamic Island.
+- **Contrôles logiciels** : TypeScript, tests automatisés et export du bundle iOS. Un export Metro réussi vérifie l’assemblage JavaScript et les ressources ; il ne prouve pas la réussite d’une compilation native signée.
+- **Sur TestFlight** : l’utilisateur a déjà installé une version, mais le numéro et le contenu de son build actuellement installé n’ont pas été vérifiés ici. Les derniers ajouts doivent être livrés dans un nouveau build pour être testés sur ce canal.
+- **Validation sur appareil** : rendu Dynamic Island et widget, notifications selon les autorisations, clavier lors de la sortie d’une séance, glisser-déposer, fichiers iCloud et conservation des données lors d’une mise à jour.
+- **Chronos** : iOS choisit la présentation de la Live Activity. Le décompte est natif ; une activité expirée peut rester à zéro jusqu’à ce que le système ou l’application puisse la retirer. La durée de séance inclut les interruptions hors de l’écran.
+- **Statistiques** : une série saisie avec des répétitions peut compter même sans coche de validation. Le bilan musculaire décrit la répartition du travail enregistré ; il ne mesure pas les muscles réels de l’utilisateur.
+- **Données** : pas de fusion de sauvegardes ni de synchronisation entre appareils. Exporter une sauvegarde complète avant un changement de téléphone. Expo Go et l’application TestFlight ont des espaces de données séparés.
+- **Sécurité des dépendances** : le dernier relevé npm documenté le 4 novembre indiquait cinq alertes modérées. Aucun nouvel audit de sécurité n’a été réalisé pour ce compte rendu ; ce rapport ne certifie pas l’absence de vulnérabilités.
+- **Fonctions absentes** : connexion à un compte, service cloud GymTracker, synchronisation Apple Santé/HealthKit, app Apple Watch dédiée, paiement/abonnement et publication App Store automatique.
+
+Documents complémentaires : [séances en salle](./AMELIORATIONS_SEANCE.md), [reprise des séances](./REPRISE_SEANCE.md), [repos, Dynamic Island et rappels](./NOTIFICATIONS_ET_REPOS.md), [vérifications](./VERIFICATION.md).

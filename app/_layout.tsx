@@ -59,6 +59,9 @@ export default function RootLayout() {
       <RestTimerObserver />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="coach" options={{ headerShown: true, title: 'Coach GymTracker', headerStyle: { backgroundColor: COLORS.background }, headerTintColor: COLORS.textPrimary }} />
+        <Stack.Screen name="coach-settings" options={{ headerShown: true, title: 'Réglages du coach', headerStyle: { backgroundColor: COLORS.background }, headerTintColor: COLORS.textPrimary }} />
+        <Stack.Screen name="prepare" options={{ headerShown: true, title: 'Préparer ma séance', headerStyle: { backgroundColor: COLORS.background }, headerTintColor: COLORS.textPrimary }} />
         <Stack.Screen name="rest" options={{ presentation: 'fullScreenModal', headerShown: false }} />
         <Stack.Screen name="restore" options={{ presentation: 'card', headerShown: true, headerTitle: 'Restaurer une sauvegarde', headerStyle: { backgroundColor: COLORS.background }, headerTintColor: COLORS.textPrimary, headerBackTitle: ' ' }} />
         <Stack.Screen name="exercises/new" options={{ headerShown: true, title: 'Ajouter un exercice', headerStyle: { backgroundColor: COLORS.background }, headerTintColor: COLORS.textPrimary, headerBackTitle: ' ' }} />

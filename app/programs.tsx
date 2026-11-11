@@ -12,13 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { getProgramsForGoals, getProgramById } from '../constants/programs';
 import { GoalSelector } from '../components/GoalSelector';
 import { useProfileStore } from '../store/profile';
-import { setSessionTitle } from '../lib/redesign';
+import { CoachSummary } from '../components/CoachSummary';
 import type { TrainingProgram } from '../types';
 import {
   getActiveProgramId,
   setActiveProgram,
   getNextProgramDayIndex,
-  createSessionFromProgramDay,
 } from '../lib/queries';
 import { useSettingsStore } from '../lib/settingsStore';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
@@ -78,15 +77,12 @@ export default function ProgramsScreen() {
 
   const handleStartNextDay = () => {
     if (!activeProgram || !nextDay) return;
-    const nextIndex = (nextDayIndex + 1) % activeProgram.days.length;
-    const sessionId = createSessionFromProgramDay(nextDay.exerciseNames, nextIndex);
-    setSessionTitle(sessionId, nextDay.label);
-    useSettingsStore.getState().loadSettings();
-    router.push(`/session/${sessionId}` as any);
+    router.push({ pathname: '/prepare', params: { programId: activeProgram.id, dayIndex: String(nextDayIndex % activeProgram.days.length) } });
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <CoachSummary />
       {/* ── Programme actif ────────────────────────────────── */}
       {activeProgram && nextDay ? (
         <View style={styles.activeCard}>

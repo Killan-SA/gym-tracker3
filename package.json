@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:regression": "node tests/regression.cjs",
     "test:import-picker": "node tests/import-picker.cjs",
-    "test:system-features": "node tests/system-features.cjs"
+    "test:system-features": "node tests/system-features.cjs",
+    "test:coach": "node tests/coach.cjs"
   },
   "dependencies": {
     "@expo/ui": "~58.0.27",

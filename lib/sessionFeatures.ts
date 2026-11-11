@@ -55,6 +55,7 @@ export function replaceSessionExercise(sessionId: string, exerciseId: string, ne
     if (!performed.length) {
       // Draft sets are specific to the previous exercise/pyramid. Keep the instance
       // (and its session note), but remove zero-rep drafts rather than relabel them.
+      for (const draft of exercise.sets.filter(set => set.reps === 0)) db.runSync('DELETE FROM user_settings WHERE key = ?', [`coach:pending:${draft.id}`]);
       db.runSync('DELETE FROM sets WHERE exercise_id = ? AND reps = 0', [exerciseId]);
       db.runSync('UPDATE exercises SET name = ? WHERE id = ?', [newName.trim(), exerciseId]);
       db.runSync('DELETE FROM user_settings WHERE key = ?', ['pyramid:' + exerciseId]);
@@ -68,7 +69,10 @@ export function replaceSessionExercise(sessionId: string, exerciseId: string, ne
         // Zero-rep drafts move as empty targets: no previous machine load or
         // pyramid metadata is attributed to the replacement.
         const drafts = exercise.sets.filter(set => set.reps === 0);
-        drafts.forEach((set, i) => db.runSync('UPDATE sets SET exercise_id = ?, set_number = ?, weight = 0, notes = NULL WHERE id = ?', [replacement.id, i + 1, set.id]));
+        drafts.forEach((set, i) => {
+          db.runSync('DELETE FROM user_settings WHERE key = ?', [`coach:pending:${set.id}`]);
+          db.runSync('UPDATE sets SET exercise_id = ?, set_number = ?, weight = 0, notes = NULL WHERE id = ?', [replacement.id, i + 1, set.id]);
+        });
       }
     }
   });

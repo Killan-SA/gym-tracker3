@@ -1,5 +1,6 @@
 import type { TrainingProgram } from '../types';
 import type { TrainingGoal } from '../constants/goals';
+import { getUserSetting } from './database';
 
 // ============================================================
 // Programmes d'entraînement statiques
@@ -239,10 +240,18 @@ for (const [goal, focus] of Object.entries(focusDays)) {
 
 export function getProgramsForGoals(goals: readonly TrainingGoal[]): TrainingProgram[] {
   const recommended = new Set(goals.map(goal => `focus-${goal}`));
-  return [...TRAINING_PROGRAMS].sort((a, b) => Number(recommended.has(b.id)) - Number(recommended.has(a.id)));
+  return TRAINING_PROGRAMS.map(p => getProgramById(p.id) ?? p).sort((a, b) => Number(recommended.has(b.id)) - Number(recommended.has(a.id)));
 }
 
 /** Retourne un programme par son id */
 export function getProgramById(id: string): TrainingProgram | undefined {
-  return TRAINING_PROGRAMS.find((p) => p.id === id);
+  const base = TRAINING_PROGRAMS.find((p) => p.id === id);
+  if (!base) return undefined;
+  try {
+    const value = JSON.parse(getUserSetting(`coach:program:${id}`) ?? 'null');
+    if (value?.version === 1 && Array.isArray(value.days) && value.days.length === base.days.length && value.days.every((day: unknown) => Array.isArray(day) && day.length > 0 && day.length <= 15 && day.every((n: unknown) => typeof n === 'string' && n.length > 0 && n.length < 150))) {
+      return { ...base, name: `${base.name} · Coach`, days: base.days.map((d, i) => ({ ...d, exerciseNames: value.days[i] })) };
+    }
+  } catch { /* Old backups have no coach plan; corrupt preferences use the original. */ }
+  return base;
 }

@@ -80,6 +80,7 @@ export default function SettingsScreen() {
       <Panel><Text style={s.muted}>Ce que j’ai envie de travailler en priorité.</Text><GoalSelector value={profile.goals} onChange={goals => profile.saveProfile(profile.name, goals)} /><View style={s.divider} /><Text style={s.eyebrow}>MON PROGRAMME</Text><Text style={s.programName}>{program?.name ?? 'Sans programme · Mode libre'}</Text><Action title="Programme ou mode libre" secondary onPress={() => router.push('/programs')} /></Panel>
 
       <Section title="Mon entraînement" />
+      <Panel><Action title="Coach GymTracker · réglages et objectifs" secondary onPress={() => router.push('/coach-settings')} /><Action title="Mon analyse et mon bilan de progression" secondary onPress={() => router.push('/coach')} /></Panel>
       <Panel><TrainingPreferences key={profile.setupRevision} /></Panel>
       <Section title="Mes rappels" />
       <Panel><CreatineReminderSettings key={profile.setupRevision} /></Panel>

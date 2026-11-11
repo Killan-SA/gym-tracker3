@@ -1,3 +1,4 @@
+import { CoachSummary } from '../../components/CoachSummary';
 import { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -27,6 +28,7 @@ export default function StatsScreen() {
     <Section title="Progression" /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 14 }}>{data?.names.map(name => <TouchableOpacity key={name} style={[s.select, selected === name && { borderColor: COLORS.primary }]} onPress={() => setSelected(name)}><Text style={{ color: selected === name ? COLORS.primary : COLORS.textSecondary }}>{name}</Text></TouchableOpacity>)}</ScrollView>
     <Panel>{history.length >= 2 ? <LineChart data={history} width={Math.max(160, width - 125)} height={175} color={COLORS.primary} thickness={3} dataPointsColor={COLORS.primary} yAxisTextStyle={s.muted} xAxisLabelTextStyle={s.muted} rulesColor={COLORS.cardBorder} yAxisColor={COLORS.cardBorder} xAxisColor={COLORS.cardBorder} /> : <Text style={s.muted}>Deux séances avec le même exercice permettent de tracer ta progression.</Text>}{selected && <Action title="Voir la fiche complète" secondary onPress={() => router.push(`/exercises/${encodeURIComponent(selected)}`)} />}</Panel>
     <Section title="Aller plus loin" /><Action title="Mon bilan musculaire détaillé" secondary onPress={() => router.push('/report')} />
+    <Section title="Analyse du coach" /><CoachSummary />
   </ScrollView>;
 }
 function readData() { return { sessions: getAllSessions(), stats: getDashboardStats(), volume: getTotalVolumeAllTime(), groups: getVolumeByMuscleGroup(), names: getAllExerciseNames() }; }

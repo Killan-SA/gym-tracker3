@@ -19,12 +19,12 @@ const shapes: { id: MuscleId; front?: string; back?: string }[] = [
 ];
 const outline = 'M120 62 L108 62 104 75 Q85 76 76 92 L69 117 64 145 54 177 59 188 66 178 78 155 88 128 92 151 86 185 84 210 83 245 85 272 82 310 88 352 85 367 79 375 Q86 383 103 378 L107 361 108 332 116 293 115 264 120 229 Z';
 
-export function MuscleMap({ muscles, selected, onSelect }: { muscles: MuscleActivity[]; selected: MuscleId | null; onSelect: (id: MuscleId) => void }) {
+export function MuscleMap({ muscles, selected, onSelect, checkIn = false }: { muscles: MuscleActivity[]; selected: MuscleId | null; onSelect: (id: MuscleId) => void; checkIn?: boolean }) {
   const [side, setSide] = useState<'front' | 'back'>('front');
   useEffect(() => { if (selected) setSide(['back', 'triceps', 'hamstrings', 'glutes'].includes(selected) ? 'back' : 'front'); }, [selected]);
   return <View>
     <View style={s.toggle}>{(['front', 'back'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="radio" accessibilityState={{ checked: side === value }} onPress={() => setSide(value)} style={[s.side, side === value && s.active]}><Text style={{ color: side === value ? COLORS.primary : COLORS.textSecondary, fontWeight: '700' }}>{value === 'front' ? 'Face' : 'Dos'}</Text></TouchableOpacity>)}</View>
-    <Svg width="100%" height={360} viewBox="20 0 200 400" accessibilityLabel={`Répartition musculaire, vue de ${side === 'front' ? 'face' : 'dos'}`}>
+    <Svg width="100%" height={360} viewBox="20 0 200 400" accessibilityLabel={`${checkIn ? 'Sélection des courbatures' : 'Répartition musculaire'}, vue de ${side === 'front' ? 'face' : 'dos'}`}>
       <Ellipse cx={120} cy={35} rx={17} ry={22} fill={COLORS.cardBorder} stroke="#52616B" />
       {[false, true].map(mirror => <G key={String(mirror)} transform={mirror ? 'translate(240 0) scale(-1 1)' : undefined}>
         <Path d={outline} fill="#1B252C" stroke="#52616B" strokeWidth={1.2} strokeLinejoin="round" />
@@ -36,7 +36,7 @@ export function MuscleMap({ muscles, selected, onSelect }: { muscles: MuscleActi
         <Path d="M65 162 L73 165 63 183 58 184 Z" fill="#34434D" />
       </G>)}
     </Svg>
-    <View style={s.legend}>{([['strong', 'Très sollicité'], ['balanced', 'Sollicité'], ['low', 'À rééquilibrer'], ['unknown', 'À découvrir']] as const).map(([status, label]) => <View key={status} style={s.legendItem}><View style={[s.dot, { backgroundColor: MUSCLE_COLORS[status] }]} /><Text style={s.label}>{label}</Text></View>)}</View>
+    {!checkIn && <View style={s.legend}>{([['strong', 'Très sollicité'], ['balanced', 'Sollicité'], ['low', 'À rééquilibrer'], ['unknown', 'À découvrir']] as const).map(([status, label]) => <View key={status} style={s.legendItem}><View style={[s.dot, { backgroundColor: MUSCLE_COLORS[status] }]} /><Text style={s.label}>{label}</Text></View>)}</View>}
     <Text style={s.hint}>Touche un muscle ou choisis un groupe ci-dessous.</Text>
   </View>;
 }

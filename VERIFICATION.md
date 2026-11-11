@@ -51,3 +51,8 @@ Après l’alignement compatible du SDK 58 le 4 novembre, le résumé npm signal
 ## Validation encore nécessaire
 
 La compilation native signée EAS et les essais TestFlight sur un iPhone restent à effectuer. Vérifier en particulier l’icône, le splash, le clavier, la vibration, le repos en arrière-plan, l’import depuis Fichiers et une mise à jour contenant déjà des séances. Aucun build n’a été envoyé à Apple pendant cette vérification.
+## Coach GymTracker — 6 novembre 2026
+
+Implémentation et règles dans [COACH_GYMTRACKER.md](./COACH_GYMTRACKER.md). 59 tests dédiés s’ajoutent aux 56 tests de régression, 6 du sélecteur et 8 des fonctions système : 129 tests. TypeScript valide et Expo Doctor 20/20. Les nouvelles préférences réutilisent `user_settings` ; la version SQLite reste 4 et les anciennes sauvegardes JSON restent compatibles. Le compteur Dynamic Island et la reprise des séances des interventions précédentes sont conservés.
+
+Le parcours Coach complet, les claviers, les brouillons de séries et le check-in sur la carte restent à essayer sur un iPhone. Un export iOS n’est pas une compilation native signée. Aucun build signé ni envoi Apple n’a été lancé dans cette intervention.

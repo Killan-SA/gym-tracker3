@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { parsePyramidSet } from '../../lib/pyramid';
 import dayjs from 'dayjs';
@@ -16,7 +16,8 @@ import { getSessionWithExercises, deleteSession, getSessionVolume } from '../../
 import { useSettingsStore } from '../../lib/settingsStore';
 import { fromKg, roundWeight, unitLabel } from '../../lib/units';
 import { COLORS, FONTS, SPACING, RADIUS } from '../../constants/theme';
-import { getSessionTitle, getSessionDurationLabel } from '../../lib/redesign';
+import { getSessionTitle, getSessionDurationLabel, canEditSession } from '../../lib/redesign';
+import { Action } from '../../components/ui';
 import type { SessionWithExercises } from '../../types';
 
 dayjs.locale('fr');
@@ -27,12 +28,12 @@ export default function SessionDetailScreen() {
   const [session, setSession] = useState<SessionWithExercises | null>(null);
   const [volume, setVolume] = useState(0);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!id) return;
     const s = getSessionWithExercises(id);
     setSession(s);
     setVolume(getSessionVolume(id));
-  }, [id]);
+  }, [id]));
 
   const handleDelete = () => {
     Alert.alert(
@@ -68,6 +69,7 @@ export default function SessionDetailScreen() {
     >
       <Text style={{ color: COLORS.textPrimary, fontSize: 32, fontWeight: '900', marginBottom: 16 }}>{getSessionTitle(session.id)}</Text>
       {getSessionDurationLabel(session.id) && <Text style={{ color: COLORS.textSecondary, marginBottom: 16 }}>{getSessionDurationLabel(session.id)}</Text>}
+      {canEditSession(session) && <View style={{ marginBottom: 16 }}><Action title={getSessionDurationLabel(session.id) ? 'Modifier la séance du jour' : 'Reprendre la séance'} onPress={() => router.push(`/session/${session.id}`)} /></View>}
       {/* Résumé de la séance */}
       <View style={styles.summaryCard}>
         <Text style={styles.date}>

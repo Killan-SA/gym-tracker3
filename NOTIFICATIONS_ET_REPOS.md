@@ -20,6 +20,12 @@ Une notification locale **Repos terminé** est programmée à l’heure de fin. 
 
 Aucun serveur, jeton push distant ou service de suivi n’est ajouté. La Live Activity utilise la cible Expo Widgets existante ; aucune fausse entrée de widget supplémentaire n’est créée pour elle.
 
+### Affichage Dynamic Island — 6 novembre 2026
+
+La présentation compacte conserve l’icône à gauche et affiche le temps restant à droite avec une largeur réservée de 52 points et des chiffres de largeur stable. La présentation minimale affiche désormais le compteur seul dans 36 points, au lieu du symbole timer. Les deux utilisent le décompte natif SwiftUI pour continuer sans intervalle JavaScript en arrière-plan. La taille du texte peut diminuer pour tenir dans la place disponible.
+
+iOS choisit la présentation visible, notamment selon les autres activités en cours. Il n’est pas possible de forcer la présentation étendue en permanence. Pour valider le changement : installer un nouveau build iOS, lancer un repos de 90 secondes, revenir à l’écran d’accueil de l’iPhone et vérifier le décompte sans appui long ; recommencer avec une autre Live Activity active, puis avec +30 s et Passer. Vérifier aussi le passage de 1:00 à 0:59, l’écran verrouillé et la fin du repos. La validation visuelle nécessite un iPhone avec Dynamic Island ; Expo Go ne charge pas cette extension.
+
 ## Rappel créatine
 
 Dans **Profil → Mes rappels** :

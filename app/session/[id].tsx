@@ -16,7 +16,7 @@ import {
   Animated,
 } from 'react-native';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, Stack, useFocusEffect } from 'expo-router';
 import DraggableFlatList from '../../components/DraggableExerciseList';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ExerciseTools } from '../../components/ExerciseTools';
@@ -55,6 +55,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExerciseVisual } from '../../components/ExerciseVisual';
 import { getPreviousPerformance, getSessionTitle, finishSession } from '../../lib/redesign';
 import { getClassicSetSuggestion } from '../../lib/progression';
+import { CoachAdvice } from '../../components/CoachAdvice';
+import { getPendingCoachSet, saveCoachDraft } from '../../lib/coach';
+import { getCoachPreferences } from '../../lib/coachStorage';
 import { getUserSetting, setUserSetting } from '../../lib/database';
 import { formatWeight, fromKg, toKg, roundWeight, unitLabel } from '../../lib/units';
 import { getExerciseCategory } from '../../constants/exercises';
@@ -106,7 +109,18 @@ export default function SessionScreen() {
     setCustomExercises(getCustomExercises());
   }, [id]);
 
-  useEffect(() => { loadSession(); }, [loadSession]);
+  useFocusEffect(useCallback(() => {
+    loadSession();
+    if (id && getSessionWithExercises(id) && getUserSetting(`session_duration:${id}`) === null) {
+      setUserSetting(`session_in_progress:${id}`, '1');
+    }
+  }, [id, loadSession]));
+
+  const leaveSession = () => {
+    Keyboard.dismiss();
+    // Let the focused field save on blur before unmounting the editor.
+    requestAnimationFrame(() => router.dismissTo('/(tabs)'));
+  };
 
   // Résultats de recherche (prédéfinis + custom)
   const searchResults = useMemo(() => {
@@ -229,6 +243,12 @@ export default function SessionScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <Stack.Screen options={{ headerLeft: () => <TouchableOpacity accessibilityRole="button" accessibilityLabel="Revenir à l'accueil et reprendre plus tard" onPress={leaveSession} style={{ paddingVertical: 10, paddingRight: 12 }}><Ionicons name="home-outline" size={24} color={COLORS.primary} /></TouchableOpacity> }} />
+      <TouchableOpacity accessibilityRole="button" onPress={leaveSession} style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+        <View style={{ flex: 1 }}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Revenir à l’accueil</Text><Text style={{ color: COLORS.textSecondary, fontSize: 12 }}>Séries sauvegardées · Tu peux reprendre plus tard</Text></View>
+      </TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" onPress={() => { Keyboard.dismiss(); router.push({ pathname: '/prepare', params: { sessionId: id } }); }} style={{ paddingHorizontal: 16, paddingBottom: 12, minHeight: 44, justifyContent: 'center' }}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Coach · Actualiser mes sensations</Text></TouchableOpacity>
       {prCelebration && (
         <PRCelebrationBanner
           data={prCelebration}
@@ -501,7 +521,8 @@ function ExerciseCard({
       <Text style={cardStyles.category}>{getExerciseCategory(exercise.name)}</Text>
       <ExerciseTools exercise={exercise} onReload={onReload} onDelete={onDeleteExercise} />
       <ExerciseVisual name={exercise.name} large />
-      {!pyramidEnabled && <View style={cardStyles.performance}><View style={{ flex: 1 }}><Text style={cardStyles.performanceLabel}>DERNIÈRE FOIS</Text><Text style={cardStyles.performanceValue}>{previous ? formatWeight(previous.weight, useKg) + ' × ' + previous.reps : 'Première séance'}</Text></View><View style={{ flex: 1, gap: 6 }}><Text style={cardStyles.performanceLabel}>{referenceValidated ? 'OBJECTIF · SÉRIES 2 OU 3' : 'SÉRIE 1 · RÉFÉRENCE'}</Text><Text style={[cardStyles.performanceValue, { color: COLORS.primary }]}>{displayedTarget ? formatWeight(displayedTarget.weight, useKg) + ' × ' + displayedTarget.reps : 'Trouve ton rythme'}</Text><Text style={{ color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 }}>{referenceValidated ? 'À tenter sur la deuxième ou troisième série.' : 'Commence par ta référence. La progression vient ensuite.'}</Text></View></View>}
+      <CoachAdvice exercise={exercise} onReload={onReload} />
+      {!pyramidEnabled && !getCoachPreferences().enabled && <View style={cardStyles.performance}><View style={{ flex: 1 }}><Text style={cardStyles.performanceLabel}>DERNIÈRE FOIS</Text><Text style={cardStyles.performanceValue}>{previous ? formatWeight(previous.weight, useKg) + ' × ' + previous.reps : 'Première séance'}</Text></View><View style={{ flex: 1, gap: 6 }}><Text style={cardStyles.performanceLabel}>{referenceValidated ? 'OBJECTIF · SÉRIES 2 OU 3' : 'SÉRIE 1 · RÉFÉRENCE'}</Text><Text style={[cardStyles.performanceValue, { color: COLORS.primary }]}>{displayedTarget ? formatWeight(displayedTarget.weight, useKg) + ' × ' + displayedTarget.reps : 'Trouve ton rythme'}</Text><Text style={{ color: COLORS.textSecondary, fontSize: 11, lineHeight: 16 }}>{referenceValidated ? 'À tenter sur la deuxième ou troisième série.' : 'Commence par ta référence. La progression vient ensuite.'}</Text></View></View>}
       {isBodyweight && <PyramidControls exerciseId={exercise.id} onReload={onReload} />}
       <View style={cardStyles.columnsHeader}>
         <Text style={[cardStyles.colLabel, { flex: 0, width: 36 }]}>Série</Text>
@@ -513,9 +534,10 @@ function ExerciseCard({
 
       {exercise.sets.map((set, setIndex) => (
         <View key={set.id}>
-          {!pyramidEnabled && !parsePyramidSet(set.notes) && setIndex <= 2 && <Text style={{ color: setIndex === 0 ? COLORS.textSecondary : COLORS.primary, fontSize: 11, marginTop: 12, marginBottom: 5 }}>{setIndex === 0 ? `RÉFÉRENCE${reference ? ' · ' + formatWeight(reference.weight, useKg) + ' × ' + reference.reps : ' · Trouve ta charge et tes répétitions'}` : referenceValidated && progressionTarget ? `OBJECTIF À TENTER · ${formatWeight(progressionTarget.weight, useKg)} × ${progressionTarget.reps}` : 'La progression sera proposée après validation de la première série.'}</Text>}
+          {!getCoachPreferences().enabled && !pyramidEnabled && !parsePyramidSet(set.notes) && setIndex <= 2 && <Text style={{ color: setIndex === 0 ? COLORS.textSecondary : COLORS.primary, fontSize: 11, marginTop: 12, marginBottom: 5 }}>{setIndex === 0 ? `RÉFÉRENCE${reference ? ' · ' + formatWeight(reference.weight, useKg) + ' × ' + reference.reps : ' · Trouve ta charge et tes répétitions'}` : referenceValidated && progressionTarget ? `OBJECTIF À TENTER · ${formatWeight(progressionTarget.weight, useKg)} × ${progressionTarget.reps}` : 'La progression sera proposée après validation de la première série.'}</Text>}
           {parsePyramidSet(set.notes) && <Text style={{ color: COLORS.primary, fontSize: 10, marginTop: 12, marginBottom: 5 }}>PYRAMIDE · PALIER {parsePyramidSet(set.notes)!.index + 1} · OBJECTIF {parsePyramidSet(set.notes)!.targetReps} REPS</Text>}
           <SetRow
+            key={`${set.id}:${JSON.stringify(getPendingCoachSet(set.id))}`}
             set={set}
             targetReps={parsePyramidSet(set.notes)?.targetReps}
             onValidated={onValidated}
@@ -549,14 +571,17 @@ function SetRow({ set, personalRecord, onDelete, onReload, onNewRecord, targetRe
   set: Set; personalRecord: number; onDelete: () => void; onReload: () => void; onNewRecord: (weight: number) => void; targetReps?: number; onValidated: (set: Set) => void;
 }) {
   const useKg = useSettingsStore(state => state.useKg);
-  const [weight, setWeight] = useState(set.weight > 0 ? String(roundWeight(fromKg(set.weight, useKg))) : '');
-  const [reps, setReps] = useState(set.reps > 0 ? String(set.reps) : '');
-  const [rpe, setRpe] = useState(set.rpe != null ? String(set.rpe) : '');
+  const pending = set.reps === 0 ? getPendingCoachSet(set.id) : null;
+  const initialWeight = pending?.weight ?? set.weight;
+  const [weight, setWeight] = useState(initialWeight > 0 ? String(roundWeight(fromKg(initialWeight, useKg))) : '');
+  const [reps, setReps] = useState(pending ? String(pending.reps) : set.reps > 0 ? String(set.reps) : '');
+  const initialRpe = pending?.rpe ?? set.rpe;
+  const [rpe, setRpe] = useState(initialRpe != null ? String(initialRpe) : '');
   const [confirmed, setConfirmed] = useState(() => getUserSetting('set_confirmed:' + set.id) === '1');
   const saved = useRef({ weight: set.weight, reps: set.reps, rpe: set.rpe });
   const previousUnit = useRef(useKg);
   useEffect(() => {
-    if (previousUnit.current !== useKg) { setWeight(saved.current.weight > 0 ? String(roundWeight(fromKg(saved.current.weight, useKg))) : ''); previousUnit.current = useKg; }
+    if (previousUnit.current !== useKg) { const kg = pending?.weight ?? saved.current.weight; setWeight(kg > 0 ? String(roundWeight(fromKg(kg, useKg))) : ''); previousUnit.current = useKg; }
   }, [useKg]);
   const save = (validate = false) => {
     const entered = Number(weight.replace(',', '.'));
@@ -566,11 +591,18 @@ function SetRow({ set, personalRecord, onDelete, onReload, onNewRecord, targetRe
       Alert.alert('Série invalide', 'Entre une charge positive ou nulle, des répétitions entières et, si renseigné, un RPE entre 1 et 10.'); return;
     }
     // Preserve the exact stored kg when an unchanged rounded lbs field loses focus.
-    const unchangedWeight = entered === roundWeight(fromKg(saved.current.weight, useKg));
-    const kg = unchangedWeight ? saved.current.weight : toKg(entered, useKg);
+    const referenceKg = pending?.weight ?? saved.current.weight;
+    const unchangedWeight = entered === roundWeight(fromKg(referenceKg, useKg));
+    const kg = unchangedWeight ? referenceKg : toKg(entered, useKg);
+    if (pending && !validate) {
+      // A coach target stays a draft even when focus changes or the app closes.
+      saveCoachDraft(set.id, { weight: kg, reps: repetitions, rpe: effort });
+      return;
+    }
     const changed = kg !== saved.current.weight || repetitions !== saved.current.reps || effort !== saved.current.rpe;
     if (changed) { updateSet(set.id, kg, repetitions, effort); saved.current = { weight: kg, reps: repetitions, rpe: effort }; if (kg > personalRecord && repetitions > 0) onNewRecord(kg); }
     if (validate) { setReps(String(repetitions)); setConfirmed(true); setUserSetting('set_confirmed:' + set.id, '1'); Vibration.vibrate(35); }
+    if (validate && pending) setUserSetting(`coach:pending:${set.id}`, 'null');
     if (changed || validate) onReload();
     if (validate && !confirmed) onValidated({ ...set, weight: kg, reps: repetitions, rpe: effort });
   };

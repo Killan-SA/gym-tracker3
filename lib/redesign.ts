@@ -1,4 +1,19 @@
 import { getDb, getUserSetting, setUserSetting } from './database';
+import type { Session } from '../types';
+
+/** Explicit marker excludes imported history, which has no recorded duration. */
+export function getResumableSessions(): Session[] {
+  return getDb().getAllSync<Session>(`SELECT s.* FROM sessions s
+    JOIN user_settings p ON p.key = 'session_in_progress:' || s.id AND p.value = '1'
+    WHERE NOT EXISTS (SELECT 1 FROM user_settings d WHERE d.key = 'session_duration:' || s.id)
+    ORDER BY s.date DESC`);
+}
+
+export function canEditSession(session: Session, now = new Date()): boolean {
+  const date = new Date(session.date);
+  const today = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+  return today || (getUserSetting(`session_in_progress:${session.id}`) === '1' && getUserSetting(`session_duration:${session.id}`) === null);
+}
 
 // Additive preferences only: the existing schema and workout records stay intact.
 export function getFavorites(): string[] {
@@ -25,6 +40,7 @@ export function setSessionTitle(id: string, title: string) { setUserSetting(`ses
 export function finishSession(id: string, seconds: number) {
   // A second visit to an old session must not overwrite its original duration.
   if (getUserSetting(`session_duration:${id}`) === null) setUserSetting(`session_duration:${id}`, String(Math.max(0, seconds)));
+  setUserSetting(`session_in_progress:${id}`, '0');
 }
 export function getSessionDurationLabel(id: string): string | null {
   const stored = getUserSetting(`session_duration:${id}`);

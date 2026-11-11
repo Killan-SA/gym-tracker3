@@ -645,5 +645,41 @@ test('Displaying a later-set target never creates a record or changes saved work
   assert.equal(JSON.stringify(q.getSessionWithExercises(s.id)), before);
   assert.equal(q.getExercisePersonalRecord(ex.name), 80);
 }));
+test('An unfinished session resumes with the same sets and program day until explicitly finished', () => isolated(() => {
+  useSettingsStore.getState().setCurrentProgram('ppl');
+  const id = q.createSessionFromProgramDay(['Pompes'], 1);
+  const ex = q.getSessionWithExercises(id).exercises[0];
+  q.addSet(ex.id, 70, 10);
+  const before = JSON.stringify(q.getSessionWithExercises(id));
+  assert.ok(redesign.getResumableSessions().some(s => s.id === id));
+  assert.equal(JSON.stringify(q.getSessionWithExercises(id)), before);
+  useSettingsStore.getState().loadSettings();
+  assert.equal(useSettingsStore.getState().currentProgramDayIndex, 1);
+  redesign.finishSession(id, 120);
+  assert.ok(!redesign.getResumableSessions().some(s => s.id === id));
+  assert.equal(JSON.stringify(q.getSessionWithExercises(id)), before);
+}));
+
+test('Imported workouts without duration and deleted sessions never appear as unfinished sessions', () => isolated(() => {
+  const now = new Date().toISOString();
+  database.prepare('INSERT INTO sessions VALUES (?, ?, NULL, ?)').run('import-today', now, now);
+  assert.ok(!redesign.getResumableSessions().some(s => s.id === 'import-today'));
+  const s = q.createSession(); q.deleteSession(s.id);
+  assert.ok(!redesign.getResumableSessions().some(row => row.id === s.id));
+}));
+
+test('Editing allows completed workouts on their local calendar day and unfinished workouts after midnight', () => isolated(() => {
+  const s = q.createSession();
+  const morning = new Date(2026, 10, 6, 9);
+  const sameDay = { ...s, date: new Date(2026, 10, 6, 22).toISOString() };
+  redesign.finishSession(s.id, 300);
+  assert.equal(redesign.canEditSession(sameDay, morning), true);
+  assert.equal(redesign.canEditSession(sameDay, new Date(2026, 10, 7, 0, 1)), false);
+  const unfinished = q.createSession();
+  assert.equal(redesign.canEditSession(unfinished, new Date(2099, 0, 1)), true);
+  redesign.finishSession(s.id, 1000);
+  assert.equal(db.getUserSetting(`session_duration:${s.id}`), '300');
+}));
+
 database.close();
 process.stdout.write(`${passed} regression checks passed.\n`);
